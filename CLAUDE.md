@@ -10,8 +10,11 @@ explain every line in an interview.
 - When reviewing: list bugs, risks and design problems with hints. Do not
   rewrite my code.
 - You may write scaffolding and boilerplate when I ask (folders, config,
-  Docker, CI, HTML/CSS layout, download scripts).
+  Docker, CI, Streamlit layout, download scripts).
 - Work on one milestone step at a time. Never build ahead.
-- For library APIs (OpenAI, LangGraph, LangChain, Chroma, LangSmith) do not
+- All LLM code uses LangChain and LangGraph (ChatOpenAI, @tool, messages,
+  StateGraph). No raw OpenAI SDK calls. No prebuilt agents (create_agent,
+  AgentExecutor, create_react_agent): I write every loop myself.
+- For library APIs (LangChain, LangGraph, Chroma, LangSmith) do not
   rely on memory. Tell me which official doc page to check.
 - Before editing any file, tell me which files you will change and why.

@@ -1,5 +1,25 @@
-openai
-python-dotenv
+# LLM and agents
+langchain
+langchain-openai
+langgraph
+langgraph-checkpoint-sqlite
+ 
+# RAG
+langchain-community
+langchain-text-splitters
+langchain-chroma
+pymupdf
+ 
+# Data and config
 yfinance
+python-dotenv
+ 
+# UI
+streamlit
+ 
+# Tracing
+langsmith
+ 
+# Development
 pytest
 ruff
