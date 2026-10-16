@@ -1,0 +1,13 @@
+{
+  "_comment": "Trimmed TCS.NS statements in raw rupees, shaped like yfinance: row name -> {period end -> value}.",
+  "currency": "INR",
+  "income_stmt": {
+    "Total Revenue":    {"2025-03-31": 2553240000000, "2024-03-31": 2408930000000},
+    "Operating Income": {"2025-03-31": 622930000000,  "2024-03-31": 594250000000},
+    "Net Income":       {"2025-03-31": 485530000000,  "2024-03-31": 459080000000}
+  },
+  "balance_sheet": {
+    "Total Debt":          {"2025-03-31": 93920000000,  "2024-03-31": 80210000000},
+    "Stockholders Equity": {"2025-03-31": 947560000000, "2024-03-31": 904890000000}
+  }
+}

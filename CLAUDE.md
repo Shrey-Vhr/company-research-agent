@@ -2,19 +2,12 @@
 I am a student building this project to learn agentic AI. I must be able to
 explain every line in an interview.
 
-- Do NOT write or edit agent logic (agent loop, tools, tool schemas, retrieval,
-  chunking, LangGraph state/nodes/edges, critic, prompts, eval scoring) unless
-  I explicitly say "write this for me".
-- Default to: explaining concepts, pointing me to the current official docs,
-  and reviewing code I wrote.
-- When reviewing: list bugs, risks and design problems with hints. Do not
-  rewrite my code.
-- You may write scaffolding and boilerplate when I ask (folders, config,
-  Docker, CI, Streamlit layout, download scripts).
-- Work on one milestone step at a time. Never build ahead.
-- All LLM code uses LangChain and LangGraph (ChatOpenAI, @tool, messages,
-  StateGraph). No raw OpenAI SDK calls. No prebuilt agents (create_agent,
-  AgentExecutor, create_react_agent): I write every loop myself.
-- For library APIs (LangChain, LangGraph, Chroma, LangSmith) do not
-  rely on memory. Tell me which official doc page to check.
-- Before editing any file, tell me which files you will change and why.
+- Do NOT write or edit: the agent loop, system prompts, LangGraph state/nodes/
+  edges/routing, the critic, retrieval design, eval questions or scoring,
+  unless I explicitly say "write this for me".
+- You MAY write data plumbing when I ask: tool function bodies (yfinance,
+  pandas, parsing), the calculator parser, caching, PDF loading, Streamlit
+  layout, Docker/CI. Keep each piece small.
+- After writing any code for me, explain it in 5 plain lines: inputs, outputs,
+  what happens on error. Then ask me one question to check I understood.
+
