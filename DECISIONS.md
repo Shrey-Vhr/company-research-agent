@@ -31,3 +31,21 @@
   - History: yfinance only returns the last 4 years.
 - Chose: use yfinance consolidated revenue as-is, convert to ₹ crore for display, label years as FY.
 - Not checked yet: INFY.NS and WIPRO.NS, and any row other than revenue.
+
+## 2026-10-17: parallel_tool_calls=True in the raw agent loop
+- Problem / context: Comparison questions ("Compare TCS and Wipro margins") need one get_financials call per
+  company. With parallel_tool_calls=False the model asks for one tool per reply, so each company costs a full
+  extra round, and every round resends the whole message history to the model.
+- Options considered: (a) False: one tool call per model reply (what playground/loop.py used);
+  (b) True: the model may return several tool calls in one reply.
+- Chose: (b) True.
+- Why: the comparison test "Compare Infosys and Wipro revenue growth over the
+  last 3 years" hit the 8-round limit with no answer. With False, each of the
+  6 independent calculate calls took its own round (2 fetches + 6 calcs = 8),
+  leaving no round for the final answer.
+- Trade-off: "parallel" only means several calls in one reply. The loop still runs them one by one, so tool
+  time is not saved. The model can also send a calculate call in the same reply as the get_financials calls it
+  depends on, before it has the real numbers, which breaks rule 1 (every figure from a tool). Every call needs
+  its own ToolMessage with the matching tool_call_id, which the loop already does.
+- Result (if measured): before (False): 8 rounds, stopped without an answer, twice.
+  After (True): [I will fill this in after rerunning].
