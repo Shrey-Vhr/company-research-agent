@@ -6,11 +6,11 @@ from langchain_community.document_loaders import PyMuPDFLoader
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reports"
 
-# File name -> (company, financial year). Must match docs/DATA_SOURCES.md.
+# File name -> (company as NSE ticker, same as get_financials input, financial year). Must match docs/DATA_SOURCES.md.
 REPORTS = {
     "tcs_fy2026.pdf": ("TCS", "FY2025-26"),
-    "infy_fy2026.pdf": ("Infosys", "FY2025-26"),
-    "wipro_fy2026.pdf": ("Wipro", "FY2025-26"),
+    "infy_fy2026.pdf": ("INFY", "FY2025-26"),
+    "wipro_fy2026.pdf": ("WIPRO", "FY2025-26"),
 }
 
 # Pages with less text than this are skipped: blank covers, "www.infosys.com", a lone "Notes" heading.
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     docs = load_reports()
     print(f"Total: {len(docs)} pages")
     # Print a few pages from each report to eyeball the text and metadata.
-    for company in ("TCS", "Infosys", "Wipro"):
+    for company in ("TCS", "INFY", "WIPRO"):
         company_docs = [d for d in docs if d.metadata["company"] == company]
         for doc in (company_docs[0], company_docs[len(company_docs) // 2]):
             print("\n" + "=" * 80)

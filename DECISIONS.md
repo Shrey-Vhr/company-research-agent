@@ -78,3 +78,33 @@
 - Trade-off: it doesn't match the number printed in the report or its table of contents, so a reader
   holding a printed copy has to use the PDF viewer's page box.
 - Result (if measured): 1,286 of 1,291 pages kept; offset is about +30 (TCS 181→211, Infosys 192→223, Wipro 274→300).
+
+## 2026-10-17: Chunk size and overlap for annual-report chunks
+- Problem / context: Report pages must be split into chunks before embedding. Chunks that are too small
+  separate a number from its label; chunks that are too big mix unrelated topics.
+- Options considered: chunk_size 3200 / chunk_overlap 400 characters, using
+  RecursiveCharacterTextSplitter with its default separators (paragraph, line, word).
+- Chose: chunk_size=3200, chunk_overlap=400 (characters, not tokens).
+- Why: a report page is a median of 2,812 characters, so 3200 keeps most pages (61%) as one whole
+  chunk, and a table or section stays together with its headings. 3200 characters is roughly
+  800 tokens, small enough to send several retrieved chunks to the model. 400 overlap (12.5%) means
+  a sentence or table row cut at a chunk boundary still appears whole in one of the two chunks.
+- Trade-off: big chunks dilute the embedding, so a search for one figure matches a whole page of
+  mixed rows and is less precise. More text per chunk also means more tokens per answer.
+  Overlap repeats text, adding about 12% more to embed and store.
+- Result (if measured): 1,286 pages -> 1,839 chunks (median 2,402 chars, smallest 93);
+  779 of 1,286 pages fit in a single chunk. Retrieval quality not measured yet.
+
+## 2026-10-17: PDF loader for annual reports (TCS broken text)
+- Problem / context: TCS text has broken words and split numbers ("C onsol i d ated", "2 0 2 5- 2 6", "1 58").
+- Options considered: (a) PyMuPDF (PyMuPDFLoader, current); (b) pypdf (PyPDFLoader); (c) regex cleanup
+  of the extracted text.
+- Chose: keep PyMuPDF; no cleanup yet; re-check with TCS retrieval scores in step 7.
+- Why: pypdf breaks the same words in the same places, so the problem is in the TCS PDF, not the loader.
+  pypdf also glues text together ("ReportsCorporate", "2 61 58") and is much slower. Regex cleanup is
+  risky without a measure of harm: it could merge real words or table numbers, so wait until step 7
+  shows whether the broken text actually hurts TCS retrieval.
+- Trade-off: TCS chunks keep the broken text for now, so searching for words like "Consolidated" or
+  "Vulnerable" may miss TCS pages, and split numbers like "1 58" won't match "158".
+- Result (if measured): broken score PyMuPDF 50 vs pypdf 54 (TCS pdf pages 128, 150, 181; Infosys 192;
+  Wipro 274, via playground/compare_loaders.py); Infosys and Wipro clean with both.

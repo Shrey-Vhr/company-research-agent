@@ -9,9 +9,10 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Stage:** hand-written tool-calling loop (`raw_agent`), before LangGraph, RAG, UI and evals.
 - **Works:** two tools (`get_financials`, `calculate`), a system prompt, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
-- **RAG, step 1 done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
-  (1,286 pages kept), tagged with company, FY and `pdf_page`. Not connected to the agent yet.
-- **Next (planned, from requirements.txt):** chunking + Chroma index + a retrieval tool, a LangGraph version
+- **RAG, steps 1–2 done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
+  (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into 1,839 chunks
+  (3,200 chars, 400 overlap) that keep that metadata. Not connected to the agent yet.
+- **Next (planned, from requirements.txt):** embed chunks into a Chroma index + a retrieval tool, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
 ## 3. How one question flows
@@ -38,13 +39,14 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/prompts.py` | `SYSTEM_PROMPT` (four rules + answer format) and `DISCLAIMER` |
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
-| `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company`, `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
+| `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company` (NSE ticker: TCS, INFY, WIPRO), `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
+| `research_agent/rag/chunker.py` | `chunk_documents(docs, chunk_size=3200, chunk_overlap=400)`: `RecursiveCharacterTextSplitter` (default separators, 3,200 chars, 400 overlap) via `split_documents`, so chunks keep page metadata, then adds `chunk` (1, 2, … within each page); `__main__` prints counts and a sample chunk |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
 | `tests/test_financials.py` | Parsing, missing-row and invalid-ticker tests using a fake `yf.Ticker`; no network |
 | `tests/fixtures/tcs_sample.json` | Two years of TCS statements in raw rupees, shaped like yfinance |
-| `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script); not used by the app |
+| `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script, `compare_loaders.py` PyMuPDF vs pypdf); not used by the app |
 | `data/reports/` | The three annual-report PDFs (gitignored; sources in `docs/DATA_SOURCES.md`) |
 | `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
@@ -77,3 +79,5 @@ Answers cite the source and financial year, never give investment advice, and en
   They differ by about 30 (TCS PDF p. 181 = printed p. 211), and some PDF pages are two-page spreads.
 - **PDF text defects:** in TCS the ₹ sign comes out as "H" (`(H crore)`) and some words are split up
   ("C onsol i d ated"); tables become one cell per line, so numbers lose their row and column labels.
+  pypdf breaks TCS the same way (broken score 50 PyMuPDF vs 54 pypdf), so PyMuPDF stays and no cleanup is done
+  until step 7 shows whether it hurts TCS retrieval. Infosys and Wipro text is clean.
