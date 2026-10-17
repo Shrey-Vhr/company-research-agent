@@ -9,7 +9,9 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Stage:** hand-written tool-calling loop (`raw_agent`), before LangGraph, RAG, UI and evals.
 - **Works:** two tools (`get_financials`, `calculate`), a system prompt, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
-- **Next (planned, from requirements.txt):** annual-report RAG (PyMuPDF + Chroma), a LangGraph version
+- **RAG, step 1 done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
+  (1,286 pages kept), tagged with company, FY and `pdf_page`. Not connected to the agent yet.
+- **Next (planned, from requirements.txt):** chunking + Chroma index + a retrieval tool, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
 ## 3. How one question flows
@@ -36,12 +38,15 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/prompts.py` | `SYSTEM_PROMPT` (four rules + answer format) and `DISCLAIMER` |
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
+| `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company`, `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
 | `tests/test_financials.py` | Parsing, missing-row and invalid-ticker tests using a fake `yf.Ticker`; no network |
 | `tests/fixtures/tcs_sample.json` | Two years of TCS statements in raw rupees, shaped like yfinance |
 | `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script); not used by the app |
+| `data/reports/` | The three annual-report PDFs (gitignored; sources in `docs/DATA_SOURCES.md`) |
+| `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
 | `requirements.txt` | Dependencies, including ones for later stages (LangGraph, Chroma, Streamlit) |
@@ -68,3 +73,7 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Calculator:** no `**`, so it can't do CAGR.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
 - **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
+- **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.
+  They differ by about 30 (TCS PDF p. 181 = printed p. 211), and some PDF pages are two-page spreads.
+- **PDF text defects:** in TCS the ₹ sign comes out as "H" (`(H crore)`) and some words are split up
+  ("C onsol i d ated"); tables become one cell per line, so numbers lose their row and column labels.

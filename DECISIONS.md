@@ -66,3 +66,15 @@
 - Result (if measured): TCS consolidated revenue from operations FY2025-26 is
   ₹2,67,021 crore in the annual report (PDF p. [n]); yfinance returns the same.
   Infosys and Wipro not checked yet.
+
+## 2026-10-17: Which page number to cite from annual reports
+- Problem / context: PyMuPDFLoader numbers pages from 0, and the number printed on a report page differs
+  from the PDF page (TCS PDF p. 181 = printed p. 211). Citations need one number a reader can check.
+- Options considered: (a) printed page number parsed from the text; (b) PDF page, 1-based (loader page + 1).
+- Chose: (b) store and cite pdf_page = metadata["page"] + 1.
+- Why: the PDFs have no page labels, many PDF pages are two-page spreads with two printed numbers,
+  and extracted digits are sometimes split ("1 31"), so the printed number can't be read reliably.
+  The PDF page is always there and is what you type into a viewer to verify.
+- Trade-off: it doesn't match the number printed in the report or its table of contents, so a reader
+  holding a printed copy has to use the PDF viewer's page box.
+- Result (if measured): 1,286 of 1,291 pages kept; offset is about +30 (TCS 181→211, Infosys 192→223, Wipro 274→300).
