@@ -49,3 +49,20 @@
   its own ToolMessage with the matching tool_call_id, which the loop already does.
 - Result (if measured): before (False): 8 rounds, stopped without an answer, twice.
   After (True): [I will fill this in after rerunning].
+
+## 2026-10-17: Annual reports for the RAG corpus
+- Problem / context: The agent needs official documents to retrieve from and cite, alongside the yfinance numbers.
+- Options considered: (a) FY2025-26 reports of TCS, Infosys, Wipro;
+  (b) two years of reports per company (FY2024-25 and FY2025-26);
+  (c) companies from different sectors (e.g. a bank and an IT company);
+  (d) quarterly results instead of annual reports.
+  Chose (a): one year keeps the index small; one sector makes comparisons fair;
+  annual reports have the most text to retrieve from.
+- Chose: FY2025-26 annual reports of TCS, Infosys and Wipro (files and source URLs in docs/DATA_SOURCES.md).
+- Why: same FY as the latest yfinance data, all three are IT services companies so comparisons make sense,
+  and they're official and citable.
+- Trade-off: Only one year of reports, so questions about earlier years rely on yfinance alone. The PDFs are
+  large (360 / 383 / 548 pages), which means more chunks to embed and search.
+- Result (if measured): TCS consolidated revenue from operations FY2025-26 is
+  ₹2,67,021 crore in the annual report (PDF p. [n]); yfinance returns the same.
+  Infosys and Wipro not checked yet.
