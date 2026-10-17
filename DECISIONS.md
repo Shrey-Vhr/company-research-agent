@@ -108,3 +108,12 @@
   "Vulnerable" may miss TCS pages, and split numbers like "1 58" won't match "158".
 - Result (if measured): broken score PyMuPDF 50 vs pypdf 54 (TCS pdf pages 128, 150, 181; Infosys 192;
   Wipro 274, via playground/compare_loaders.py); Infosys and Wipro clean with both.
+
+## 2026-10-17: Batch size when adding chunks to Chroma
+- Problem / context: 1,839 chunks must be embedded; one OpenAI embeddings request is limited to 300,000 tokens.
+- Options considered: (a) send all chunks in one add_documents call; (b) fixed batches of 100 chunks.
+- Chose: (b) BATCH_SIZE = 100.
+- Why: 100 chunks x 3,200 chars is about 80,000 tokens, well under the limit, and a failure loses at most one batch;
+  fixed IDs mean re-running after a failure just overwrites what was saved.
+- Trade-off: 19 calls instead of 1, so slightly slower; the 4-chars-per-token estimate is rough for number-heavy pages.
+- Result (if measured): not built yet.

@@ -11,8 +11,10 @@ Answers cite the source and financial year, never give investment advice, and en
   a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
 - **RAG, steps 1–2 done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
   (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into 1,839 chunks
-  (3,200 chars, 400 overlap) that keep that metadata. Not connected to the agent yet.
-- **Next (planned, from requirements.txt):** embed chunks into a Chroma index + a retrieval tool, a LangGraph version
+  (3,200 chars, 400 overlap) that keep that metadata; `rag/store.py` can save them to Chroma (`data/chroma`).
+  `scripts/build_index.py` runs load -> chunk -> cost estimate -> y/n -> embed. The index has not been built yet,
+  there is no search, and RAG is not connected to the agent yet.
+- **Next (planned, from requirements.txt):** build the index, write search + a retrieval tool, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
 ## 3. How one question flows
@@ -41,6 +43,8 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
 | `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company` (NSE ticker: TCS, INFY, WIPRO), `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
 | `research_agent/rag/chunker.py` | `chunk_documents(docs, chunk_size=3200, chunk_overlap=400)`: `RecursiveCharacterTextSplitter` (default separators, 3,200 chars, 400 overlap) via `split_documents`, so chunks keep page metadata, then adds `chunk` (1, 2, … within each page); `__main__` prints counts and a sample chunk |
+| `research_agent/rag/store.py` | `get_store`: Chroma collection `annual_reports` in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
+| `scripts/build_index.py` | Builds the index: `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
