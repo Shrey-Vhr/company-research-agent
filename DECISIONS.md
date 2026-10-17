@@ -116,4 +116,4 @@
 - Why: 100 chunks x 3,200 chars is about 80,000 tokens, well under the limit, and a failure loses at most one batch;
   fixed IDs mean re-running after a failure just overwrites what was saved.
 - Trade-off: 19 calls instead of 1, so slightly slower; the 4-chars-per-token estimate is rough for number-heavy pages.
-- Result (if measured): not built yet.
+- Result (if measured): build_index embedding ended with a count of 1839 two times and it ran in approx. 37 seconds.

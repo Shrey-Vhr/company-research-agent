@@ -8,7 +8,7 @@ from research_agent.rag.loader import load_reports
 from research_agent.rag.store import add_chunks
 
 # US dollars per 1 million input tokens for your EMBEDDING_MODEL. Fill in from https://openai.com/api/pricing/
-PRICE_PER_MILLION_TOKENS = None
+PRICE_PER_MILLION_TOKENS = 0.02
 
 CHARS_PER_TOKEN = 4  # rough rule of thumb for English text
 
