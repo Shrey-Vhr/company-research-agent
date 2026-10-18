@@ -9,12 +9,12 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Stage:** hand-written tool-calling loop (`raw_agent`), before LangGraph, RAG, UI and evals.
 - **Works:** two tools (`get_financials`, `calculate`), a system prompt, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
-- **RAG, steps 1–2 done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
+- **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
   (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into 1,839 chunks
-  (3,200 chars, 400 overlap) that keep that metadata; `rag/store.py` can save them to Chroma (`data/chroma`).
-  `scripts/build_index.py` runs load -> chunk -> cost estimate -> y/n -> embed. The index has not been built yet,
-  there is no search, and RAG is not connected to the agent yet.
-- **Next (planned, from requirements.txt):** build the index, write search + a retrieval tool, a LangGraph version
+  (3,200 chars, 400 overlap) that keep that metadata; `scripts/build_index.py` embedded them into Chroma
+  (`data/chroma`, 1,839 items); `rag/search.py` finds the top k chunks, optionally filtered by company and FY.
+  RAG is not connected to the agent yet (no retrieval tool).
+- **Next (planned, from requirements.txt):** a retrieval tool for the agent, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
 ## 3. How one question flows
@@ -45,6 +45,7 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/rag/chunker.py` | `chunk_documents(docs, chunk_size=3200, chunk_overlap=400)`: `RecursiveCharacterTextSplitter` (default separators, 3,200 chars, 400 overlap) via `split_documents`, so chunks keep page metadata, then adds `chunk` (1, 2, … within each page); `__main__` prints counts and a sample chunk |
 | `research_agent/rag/store.py` | `get_store`: Chroma collection `annual_reports` in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
 | `scripts/build_index.py` | Builds the index: `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
+| `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5)`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
@@ -85,3 +86,7 @@ Answers cite the source and financial year, never give investment advice, and en
   ("C onsol i d ated"); tables become one cell per line, so numbers lose their row and column labels.
   pypdf breaks TCS the same way (broken score 50 PyMuPDF vs 54 pypdf), so PyMuPDF stays and no cleanup is done
   until step 7 shows whether it hurts TCS retrieval. Infosys and Wipro text is clean.
+- **Search:** a wrong filter value (`"Infosys"` instead of `"INFY"`, or an FY that isn't indexed) returns `[]`
+  with no error. There is no score cutoff, so it always returns k chunks even when none is relevant
+  ("number of employees" for INFY: best match is p. 143, about customers). Scores bunch together (about 1.0–1.25),
+  so they don't separate good and bad matches well. `get_store()` is rebuilt on every search call.

@@ -117,3 +117,30 @@
   fixed IDs mean re-running after a failure just overwrites what was saved.
 - Trade-off: 19 calls instead of 1, so slightly slower; the 4-chars-per-token estimate is rough for number-heavy pages.
 - Result (if measured): build_index embedding ended with a count of 1839 two times and it ran in approx. 37 seconds.
+
+## 2026-10-18: Filter search by company and FY metadata
+- Problem / context: An unfiltered search mixes all three companies: "number of employees" returned
+  WIPRO, TCS, WIPRO, TCS, INFY. A question about one company needs chunks from that company only.
+- Options considered: (a) no filter, let the model sort out which company each chunk is from;
+  (b) search more chunks and drop other companies afterwards in Python; (c) Chroma metadata filter
+  (where) on company and fy, applied inside the search.
+- Chose: (c) optional company and fy arguments; one condition is passed directly, two are combined with $and.
+- Why: the filter runs before ranking, so all k results come from the right company instead of k
+  minus the ones thrown away; the metadata is already on every chunk from the loader.
+- Trade-off: the filter value must match exactly ("INFY", not "Infosys"; "FY2025-26"), and a wrong
+  value returns [] with no error. Comparing two companies needs two searches.
+- Result (if measured): "number of employees" with company="TCS" returned 5 TCS chunks, top hit
+  p. 108 (employee table); with company="INFY", fy="FY2025-26" 5 INFY chunks; a wrong name ("Infosys") returned [].
+
+## 2026-10-18: Search returns top 5 chunks as plain dicts with distance score
+- Problem / context: search results go to the agent (and later a tool), which needs text plus
+  citation fields, not LangChain Document objects.
+- Options considered: k = 4 (Chroma default) or 5; return Documents, or dicts with selected fields;
+  with or without a score cutoff.
+- Chose: k=5 by default; return dicts text, company, fy, pdf_page, score (rounded to 3 decimals); no cutoff yet.
+- Why: dicts are easy to print, test and turn into a tool result; pdf_page is the number we cite;
+  the score is kept so a cutoff can be chosen later from real numbers.
+- Trade-off: always returns 5 chunks, even weak ones (INFY "number of employees" best match is about
+  customers, p. 143). 5 chunks of up to 3,200 chars is about 4,000 tokens per search sent to the model.
+  The score is an L2 distance (lower = closer), not a percentage, and scores bunch together (about 1.0–1.25).
+- Result (if measured): 3 test searches in about 9 s in total, including startup and one embedding call each.
