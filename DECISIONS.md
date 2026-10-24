@@ -144,3 +144,56 @@
   customers, p. 143). 5 chunks of up to 3,200 chars is about 4,000 tokens per search sent to the model.
   The score is an L2 distance (lower = closer), not a percentage, and scores bunch together (about 1.0–1.25).
 - Result (if measured): 3 test searches in about 9 s in total, including startup and one embedding call each.
+
+## 2026-10-19: Build the retrieval answer key with plain text search
+- Problem / context: The retrieval eval needs gold pages for each question, found without using the
+  system being tested.
+- Options considered: (a) label pages from my own vector search results; (b) regex/keyword search
+  over the raw PyMuPDF page text (page index + 1, same numbering as the loader).
+- Chose: (b)
+- Why: the answer key stays independent of the system it tests; labels from vector search would
+  only reward the search for agreeing with itself.
+- Trade-off: manual and slower; tables extract as runs of numbers ("1 126 127 ... 185 185"), so
+  snippets are less readable.
+- Result (if measured): all 6 answers found; it also caught a wrong old note
+  ("also on p. 12" for r01; p.12 has no headcount).
+
+## 2026-10-19: Fix eval questions so each one has a single clear answer in its own company's report
+- Problem / context: In r02–r05 the `company` field named a different company than the question
+  (e.g. company TCS, question about INFY's dividend). No report mentions a competitor's answer, so
+  with the company filter these questions could never succeed. r04 (offices: 311 vs 312) and
+  r05 ("a named risk": ~10 valid answers) were ambiguous.
+- Options considered: keep the questions as cross-company "trap" questions; or match each
+  `company` to the question and reword the ambiguous ones.
+- Chose: matched every `company` to the company the question asks about; r01 -> "permanent
+  employees at year end"; r04 -> "international offices" (185); r05 -> "How does Infosys describe
+  cybersecurity as a business risk?" (p.134).
+- Why: a retrieval eval should test whether search finds the page, not whether the question is
+  answerable at all; one clear answer per question makes a hit or miss unambiguous.
+- Trade-off: no question currently tests cross-company or unanswerable cases.
+- Result (if measured): 6 questions, each with a single answer that can be checked by page.
+
+## 2026-10-19: answer_pages is a list of every page that fully answers the question
+- Problem / context: Most answers appear on several pages (r03 on 8 pages). With one gold page,
+  a search that returns another correct page would be scored as a miss.
+- Options considered: one gold page per question; or a list of acceptable pages.
+- Chose: `answer_pages` list; a page is included only if it fully answers the question, and the
+  `note` says why near-misses were left out.
+- Why: p.108 left out for r01 because it gives 6,17,437 including non-permanent staff; p.243
+  left out for r02 because it only mentions the final Rs 25, not the total; p.42, p.108, p.110,
+  p.132 left out for r05 because they mention cybersecurity but do not describe it as a business risk.
+- Trade-off: lists are uneven (r04 and r05 have 1 page, r03 has 8), so questions with many copies
+  of the answer are easier to hit; deciding "fully answers" is a judgement call.
+- Result (if measured): not measured yet (no scoring script).
+
+## 2026-10-20: Retrieval eval scores by page, filtered by company, top 5
+- Problem / context: Need a repeatable number for how well search() finds the answer page.
+- Options considered: score by page vs by answer text; filter by company vs search all reports; k = 3/5/10.
+- Chose: search(question, company=item["company"], k=5); compare result pdf_pages with answer_pages via is_hit;
+  report total and per-company hit rate; save each run to evals/results/retrieval_<date>.json.
+- Why: k=5 is what the agent will get; the company filter matches how the agent will search;
+  saved runs let me compare before/after a change (chunk size, k, embeddings).
+- Trade-off: a page hit doesn't prove the chunk contains the answer (long pages are split into chunks);
+  6 questions is too few for small differences to mean anything. Questions with more accepted pages are
+  easier to hit (r03 has 8, r04 has 1), so per-company hit rates are not fully comparable.
+- Result (if measured): not run yet.

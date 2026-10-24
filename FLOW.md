@@ -14,6 +14,10 @@ Answers cite the source and financial year, never give investment advice, and en
   (3,200 chars, 400 overlap) that keep that metadata; `scripts/build_index.py` embedded them into Chroma
   (`data/chroma`, 1,839 items); `rag/search.py` finds the top k chunks, optionally filtered by company and FY.
   RAG is not connected to the agent yet (no retrieval tool).
+- **Retrieval eval, started:** `evals/retrieval_questions.json` has 6 questions (2 per company), each with
+  a list of gold `answer_pages`: every page that fully answers it. The pages were found by plain text search
+  on PyMuPDF page text, not by the vector search. `evals/run_retrieval_eval.py` runs the eval; `is_hit`
+  is written (HIT if any of the 5 result pages is in `answer_pages`). Not run yet, so there is no score.
 - **Next (planned, from requirements.txt):** a retrieval tool for the agent, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
@@ -46,6 +50,8 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/rag/store.py` | `get_store`: Chroma collection `annual_reports` in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
 | `scripts/build_index.py` | Builds the index: `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
 | `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5)`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
+| `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
+| `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval`: `search(question, company, k=5)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<date>.json` |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
@@ -78,6 +84,9 @@ Answers cite the source and financial year, never give investment advice, and en
   converted from USD at the yearly average rate, so its figures are approximate. FY labels assume a March year-end.
 - **Repeatability:** the cache expires after 7 days, so eval answers can change when Yahoo updates its data.
 - **Calculator:** no `**`, so it can't do CAGR.
+- **Retrieval eval is small and uneven:** 6 questions; `answer_pages` ranges from 1 page (r04, r05) to 8 (r03),
+  so some questions are easier to hit and per-company hit rates are not fully comparable.
+  No cross-company or unanswerable questions yet.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
 - **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
 - **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.
