@@ -8,10 +8,11 @@ from langchain.messages import HumanMessage, SystemMessage, ToolMessage
 from research_agent.tools.financials import get_financials
 from research_agent.tools.calculator import calculate
 from research_agent.prompts import SYSTEM_PROMPT
+from research_agent.tools.reports import search_reports
 
 load_dotenv()
 def run_agent(question: str) -> str:
-    tools = {"get_financials": get_financials, "calculate": calculate}
+    tools = {"get_financials": get_financials, "calculate": calculate,  "search_reports": search_reports}
     model = ChatOpenAI(model=os.environ["LLM_MODEL"]).bind_tools(
         list(tools.values()), parallel_tool_calls=True
     )
