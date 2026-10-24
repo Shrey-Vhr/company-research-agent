@@ -1,8 +1,9 @@
 """Retrieval eval: run search() on each question and check whether a gold page is in the top 5.
 
-Run from the project root: python -m evals.run_retrieval_eval
+Run from the project root: python -m evals.run_retrieval_eval [--collection annual_reports_1600]
 """
 
+import argparse
 import json
 from datetime import date
 from pathlib import Path
@@ -24,11 +25,16 @@ def is_hit(result_pages, answer_pages):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--collection", default="annual_reports_1600")
+    args = parser.parse_args()
+
     items = json.loads(QUESTIONS_FILE.read_text(encoding="utf-8"))
+    print(f"Collection: {args.collection}")
 
     rows = []
     for item in items:
-        results = search(item["question"], company=item["company"], k=K)
+        results = search(item["question"], company=item["company"], k=K, collection_name=args.collection)
         result_pages = [r["pdf_page"] for r in results]
         hit = is_hit(result_pages, item["answer_pages"])
         print(f'{item["id"]}  {item["company"]:<6} {"HIT " if hit else "MISS"}  pages {result_pages}')
@@ -53,9 +59,10 @@ if __name__ == "__main__":
         print(f"  {company:<6} {company_hits}/{company_total} = {company_hits / company_total:.0%}")
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    out_file = RESULTS_DIR / f"retrieval_{date.today().isoformat()}.json"
+    out_file = RESULTS_DIR / f"retrieval_{args.collection}_{date.today().isoformat()}.json"
     summary = {
         "date": date.today().isoformat(),
+        "collection": args.collection,
         "k": K,
         "hits": hits,
         "total": len(rows),

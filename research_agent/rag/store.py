@@ -16,11 +16,11 @@ COLLECTION = "annual_reports"
 BATCH_SIZE = 100
 
 
-def get_store():
-    """Return the Chroma store saved in data/chroma, embedding with EMBEDDING_MODEL from .env."""
+def get_store(collection_name=COLLECTION):
+    """Return the named Chroma collection saved in data/chroma, embedding with EMBEDDING_MODEL from .env."""
     embeddings = OpenAIEmbeddings(model=os.environ["EMBEDDING_MODEL"])
     return Chroma(
-        collection_name=COLLECTION,
+        collection_name=collection_name,
         embedding_function=embeddings,
         persist_directory=str(CHROMA_DIR),
     )
@@ -32,9 +32,9 @@ def chunk_id(chunk):
     return f"{m['company']}-{m['fy']}-p{m['pdf_page']}-c{m['chunk']}".lower()
 
 
-def add_chunks(chunks):
+def add_chunks(chunks, collection_name=COLLECTION):
     """Embed and save chunks in batches of BATCH_SIZE. Chroma upserts by ID, so nothing is duplicated."""
-    store = get_store()
+    store = get_store(collection_name)
     for start in range(0, len(chunks), BATCH_SIZE):
         batch = chunks[start:start + BATCH_SIZE]
         store.add_documents(batch, ids=[chunk_id(c) for c in batch])

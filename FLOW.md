@@ -10,14 +10,16 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Works:** two tools (`get_financials`, `calculate`), a system prompt, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
-  (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into 1,839 chunks
-  (3,200 chars, 400 overlap) that keep that metadata; `scripts/build_index.py` embedded them into Chroma
-  (`data/chroma`, 1,839 items); `rag/search.py` finds the top k chunks, optionally filtered by company and FY.
+  (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into chunks that keep
+  that metadata. Two Chroma collections sit in `data/chroma`: `annual_reports` (3,200 chars, 400 overlap, 1,839 chunks,
+  kept for comparison) and `annual_reports_1600` (1,600 chars, 200 overlap, 3,314 chunks, the default for
+  `scripts/build_index.py`, `rag/search.py` and the eval); `rag/search.py` finds the top k chunks, optionally filtered by company and FY.
   RAG is not connected to the agent yet (no retrieval tool).
 - **Retrieval eval, started:** `evals/retrieval_questions.json` has 6 questions (2 per company), each with
   a list of gold `answer_pages`: every page that fully answers it. The pages were found by plain text search
   on PyMuPDF page text, not by the vector search. `evals/run_retrieval_eval.py` runs the eval; `is_hit`
-  is written (HIT if any of the 5 result pages is in `answer_pages`). Not run yet, so there is no score.
+  is written (HIT if any of the 5 result pages is in `answer_pages`). Results on 2026-10-24: `annual_reports` (3,200) 3/6,
+  `annual_reports_1600` 4/6; saved in `evals/results/`.
 - **Next (planned, from requirements.txt):** a retrieval tool for the agent, a LangGraph version
   of the agent, a Streamlit UI, LangSmith tracing and evals.
 
@@ -47,11 +49,11 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
 | `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company` (NSE ticker: TCS, INFY, WIPRO), `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
 | `research_agent/rag/chunker.py` | `chunk_documents(docs, chunk_size=3200, chunk_overlap=400)`: `RecursiveCharacterTextSplitter` (default separators, 3,200 chars, 400 overlap) via `split_documents`, so chunks keep page metadata, then adds `chunk` (1, 2, … within each page); `__main__` prints counts and a sample chunk |
-| `research_agent/rag/store.py` | `get_store`: Chroma collection `annual_reports` in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
-| `scripts/build_index.py` | Builds the index: `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
-| `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5)`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
+| `research_agent/rag/store.py` | `get_store(collection_name="annual_reports")`: the named Chroma collection in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks(chunks, collection_name)`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
+| `scripts/build_index.py` | Builds the index (`python -m scripts.build_index`, defaults `--chunk-size 1600 --chunk-overlap 200 --collection annual_reports_1600`): `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
+| `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5, collection_name="annual_reports_1600")`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
 | `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
-| `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval`: `search(question, company, k=5)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<date>.json` |
+| `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval [--collection NAME]` (default `annual_reports_1600`): `search(question, company, k=5, collection_name)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<collection>_<date>.json` (collection name also inside the file) |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
@@ -86,7 +88,8 @@ Answers cite the source and financial year, never give investment advice, and en
 - **Calculator:** no `**`, so it can't do CAGR.
 - **Retrieval eval is small and uneven:** 6 questions; `answer_pages` ranges from 1 page (r04, r05) to 8 (r03),
   so some questions are easier to hit and per-company hit rates are not fully comparable.
-  No cross-company or unanswerable questions yet.
+  No cross-company or unanswerable questions yet. The 1,600 vs 3,200 chunk result (4/6 vs 3/6) is one question
+  out of six: it points one way but 6 questions can't prove it; the plan calls for 15.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
 - **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
 - **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.

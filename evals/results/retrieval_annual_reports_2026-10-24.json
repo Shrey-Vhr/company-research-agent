@@ -1,0 +1,181 @@
+{
+  "date": "2026-10-24",
+  "collection": "annual_reports",
+  "k": 5,
+  "hits": 3,
+  "total": 6,
+  "hit_rate": 0.5,
+  "by_company": {
+    "TCS": {
+      "hits": 1,
+      "total": 2
+    },
+    "INFY": {
+      "hits": 1,
+      "total": 2
+    },
+    "WIPRO": {
+      "hits": 1,
+      "total": 2
+    }
+  },
+  "results": [
+    {
+      "id": "r01",
+      "company": "TCS",
+      "question": "How many permanent employees did TCS have at year end?",
+      "answer_pages": [
+        69,
+        23,
+        43,
+        108,
+        129
+      ],
+      "result_pages": [
+        55,
+        58,
+        27,
+        108,
+        5
+      ],
+      "scores": [
+        0.752,
+        0.76,
+        0.768,
+        0.779,
+        0.782
+      ],
+      "hit": true
+    },
+    {
+      "id": "r02",
+      "company": "INFY",
+      "question": "What is dividend per share of INFY?",
+      "answer_pages": [
+        38,
+        18,
+        36
+      ],
+      "result_pages": [
+        119,
+        26,
+        122,
+        323,
+        120
+      ],
+      "scores": [
+        0.725,
+        0.765,
+        0.795,
+        0.808,
+        0.835
+      ],
+      "hit": false
+    },
+    {
+      "id": "r03",
+      "company": "WIPRO",
+      "question": "What is the name of CEO of WIPRO?",
+      "answer_pages": [
+        103,
+        19,
+        21,
+        113,
+        131,
+        140,
+        145,
+        152
+      ],
+      "result_pages": [
+        5,
+        14,
+        4,
+        120,
+        98
+      ],
+      "scores": [
+        0.802,
+        0.806,
+        0.815,
+        0.82,
+        0.829
+      ],
+      "hit": false
+    },
+    {
+      "id": "r04",
+      "company": "TCS",
+      "question": "How many international offices does TCS have?",
+      "answer_pages": [
+        107
+      ],
+      "result_pages": [
+        5,
+        360,
+        26,
+        54,
+        27
+      ],
+      "scores": [
+        0.726,
+        0.73,
+        0.74,
+        0.78,
+        0.782
+      ],
+      "hit": false
+    },
+    {
+      "id": "r05",
+      "company": "INFY",
+      "question": "How does Infosys describe cybersecurity as a business risk?",
+      "answer_pages": [
+        134
+      ],
+      "result_pages": [
+        135,
+        134,
+        131,
+        148,
+        147
+      ],
+      "scores": [
+        0.666,
+        0.731,
+        0.739,
+        0.803,
+        0.806
+      ],
+      "hit": true
+    },
+    {
+      "id": "r06",
+      "company": "WIPRO",
+      "question": "What is the acquisition during the year of WIPRO?",
+      "answer_pages": [
+        101,
+        8,
+        21,
+        209,
+        250,
+        387,
+        388
+      ],
+      "result_pages": [
+        366,
+        101,
+        98,
+        430,
+        258
+      ],
+      "scores": [
+        0.72,
+        0.722,
+        0.723,
+        0.733,
+        0.741
+      ],
+      "hit": true
+    }
+  ]
+}

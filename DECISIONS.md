@@ -199,3 +199,20 @@
 - Result (if measured):  baseline with 3,200-char chunks: 3/6 (50%). Hits on descriptive
   questions (risk, acquisition) and r01; misses on short exact facts
   (dividend, CEO name, office count).
+
+## 2026-10-24: Chunk size 1,600 chars (overlap 200) instead of 3,200 (overlap 400)
+- Problem / context: Retrieval eval hit rate was 3/6 with 3,200-char chunks (1,839 chunks). Large chunks hold
+  many topics, so one chunk's embedding is a blur and the right page can rank below others.
+- Options considered: 3,200/400 (current) vs 1,600/200, each in its own Chroma collection
+  (annual_reports vs annual_reports_1600), same questions, k=5, company filter.
+- Chose: 1,600/200 as the new default (3,314 chunks). The 3,200 collection stays on disk for comparison.
+- Why: hit rate rose from 3/6 to 4/6. The only question that changed was r03 (WIPRO CEO): MISS -> HIT
+  (p.145). r01, r05, r06 hit on both; r02 and r04 miss on both. On r05 the right page (134) moved from 2nd
+  to 1st, and the top score was lower (closer) on r04 and r06 (r05 about the same).
+- Trade-off: 80% more chunks (3,314 vs 1,839), so more embedding cost and ~5 chunks of ~1,600 chars sent to the
+  model instead of ~3,200. The result is small: one question out of six is a small difference. It points
+  clearly in one direction, but 6 questions can't prove it. That's why the plan calls for 15 questions.
+  Also, r03 has 8 accepted pages, so it is the easiest to hit, and r02 and r04 still miss with both sizes,
+  so chunk size is not what is failing there.
+- Result (if measured): 3/6 vs 4/6 (TCS 1/2 vs 1/2, INFY 1/2 vs 1/2, WIPRO 1/2 vs 2/2). Both runs
+  are in evals/results/ (retrieval_annual_reports_*.json, retrieval_annual_reports_1600_*.json).

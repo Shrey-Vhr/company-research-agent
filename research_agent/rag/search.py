@@ -3,8 +3,8 @@ from research_agent.rag.store import get_store
 
 # In Chroma, a lower score means a closer match, because it’s a distance.
 # results = store.similarity_search_with_score("number of employees", k=5, filter={"company": "TCS"})
-def search(query, company=None, fy=None, k=5):
-    store=get_store()
+def search(query, company=None, fy=None, k=5, collection_name="annual_reports_1600"):
+    store=get_store(collection_name)
     conditions = []
     if company:
         conditions.append({"company": company})
