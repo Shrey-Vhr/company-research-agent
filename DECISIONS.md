@@ -196,4 +196,6 @@
 - Trade-off: a page hit doesn't prove the chunk contains the answer (long pages are split into chunks);
   6 questions is too few for small differences to mean anything. Questions with more accepted pages are
   easier to hit (r03 has 8, r04 has 1), so per-company hit rates are not fully comparable.
-- Result (if measured): not run yet.
+- Result (if measured):  baseline with 3,200-char chunks: 3/6 (50%). Hits on descriptive
+  questions (risk, acquisition) and r01; misses on short exact facts
+  (dividend, CEO name, office count).
