@@ -8,7 +8,7 @@ Answers cite the source and financial year, never give investment advice, and en
 ## 2. Current status
 - **Stage:** hand-written tool-calling loop (`raw_agent`), before LangGraph, RAG, UI and evals.
 - **Works:** two tools (`get_financials`, `calculate`), a system prompt, the loop with an 8-round limit,
-  a command-line entry point, a 7-day JSON cache, and 22 offline unit tests for the tools.
+  a command-line entry point, a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
   (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into chunks that keep
   that metadata. Two Chroma collections sit in `data/chroma`: `annual_reports` (3,200 chars, 400 overlap, 1,839 chunks,
@@ -58,13 +58,14 @@ Answers cite the source and financial year, never give investment advice, and en
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
 | `tests/test_financials.py` | Parsing, missing-row and invalid-ticker tests using a fake `yf.Ticker`; no network |
+| `tests/test_chunker.py` | 8 offline tests for `chunk_documents` on small fake Documents (size limit, overlap, metadata, no page mixing, chunk numbering per page and company, short page, no empty chunks); no PDFs, API or Chroma |
 | `tests/fixtures/tcs_sample.json` | Two years of TCS statements in raw rupees, shaped like yfinance |
 | `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script, `compare_loaders.py` PyMuPDF vs pypdf); not used by the app |
 | `data/reports/` | The three annual-report PDFs (gitignored; sources in `docs/DATA_SOURCES.md`) |
 | `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
-| `requirements.txt` | Dependencies, including ones for later stages (LangGraph, Chroma, Streamlit) |
+| `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including ones for later stages (LangGraph, Streamlit) |
 | `CLAUDE.md` / `DECISIONS.md` / `FLOW.md` | Working rules / decision log / this file |
 | `README.md` | Title only |
 
@@ -102,3 +103,6 @@ Answers cite the source and financial year, never give investment advice, and en
   with no error. There is no score cutoff, so it always returns k chunks even when none is relevant
   ("number of employees" for INFY: best match is p. 143, about customers). Scores bunch together (about 1.0–1.25),
   so they don't separate good and bad matches well. `get_store()` is rebuilt on every search call.
+- **Deprecated loader dependency:** the loader uses `PyMuPDFLoader` from `langchain-community`, which pytest
+  warns is being sunset and no longer maintained. It works now. Versions are pinned in `requirements.txt`;
+  plan: replace it with `pymupdf` directly in Milestone 6.
