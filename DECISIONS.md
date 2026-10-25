@@ -216,3 +216,16 @@
   so chunk size is not what is failing there.
 - Result (if measured): 3/6 vs 4/6 (TCS 1/2 vs 1/2, INFY 1/2 vs 1/2, WIPRO 1/2 vs 2/2). Both runs
   are in evals/results/ (retrieval_annual_reports_*.json, retrieval_annual_reports_1600_*.json).
+
+## 2026-10-25: Net profit differs between yfinance and the TCS annual report
+- Problem / context: For "Compare TCS's net margin with what its annual report
+  says", the two sources gave different profit figures for FY2025-26.
+- Figures: yfinance net income ₹49,210 crore (margin 18.4%); annual report
+  profit after tax ₹52,820 crore (p. 69) and PAT / total revenue 19.8% (p. 70).
+- Checked: both report numbers appear in the cited passages (text check);
+  ₹52,820 crore is in the [FY2026 / FY2025] column (checked by eye on p. 69).
+- Likely cause: Not yet identified; the report’s definition needs checking.
+- Handling: the agent reports both figures, gives the gap, and treats the
+  annual report as the official source (prompt rule 10).
+- Trade-off: answers show two numbers instead of one, which is less tidy but
+  honest; garbled TCS table headers mean the year column must be checked by eye.
