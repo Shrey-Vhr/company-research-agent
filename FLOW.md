@@ -7,8 +7,9 @@ reports (TCS, Infosys, Wipro) and do arithmetic. Answers cite the source and pag
 advice, and end with a disclaimer.
 
 ## 2. Current status
-- **Stage:** Milestone 2 complete: the hand-written tool-calling loop (`raw_agent`) now has RAG over the three annual
-  reports, a retrieval eval and grounding rules. Still before LangGraph, the critic and the UI.
+- **Stage:** Milestone 3 in progress. Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and
+  grounding rules) is complete and still works. The LangGraph version has a state, four node functions (planner,
+  executor, writer, critic) and a manual runner, but **no graph yet**: no `StateGraph`, edges, routing or revision loop.
 - **Works:** three tools (`get_financials`, `calculate`, `search_reports`), a system prompt with 11 rules, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
@@ -24,8 +25,15 @@ advice, and end with a disclaimer.
   `annual_reports_1600` 4/6; saved in `evals/results/`.
 - **Failures found by hand** are written up in `evals/FAILURES.md` (F01 wrong CEO from a signature block, F02 answer
   from the model's own knowledge with a wrong citation); both were fixed with prompt rules.
-- **Next (planned):** Milestone 3: a critic with a code check (every name and number in the draft must appear in the
-  evidence), then a LangGraph version of the agent, a Streamlit UI, LangSmith tracing, and more eval questions (15).
+- **LangGraph pieces, tested by hand only:** `graph/state.py` (`ResearchState`), `graph/nodes.py` (`planner`,
+  `executor`, `writer`, `critic`) and `graph/numbers.py` (number matching for the critic's code check). The nodes are
+  tried through the `__main__` runner, which saves the run to `data/runs/last_run.json`. Only `numbers.py` has tests
+  (13); the 43 tests in `tests/` all pass.
+- **Failure F03 found and fixed:** the code check passed "2.0 percentage points" that no calculation produced, because
+  a number inside the `fetched_at` timestamp rounded to 2.0. `extract_numbers` now ignores ISO dates and times
+  (regression test added; details in `evals/FAILURES.md`). It was found with `explain_support`.
+- **Next (planned):** build the graph (nodes, edges, routing for out-of-scope, executor loop, critic -> writer
+  revision loop with a limit, human feedback), then a Streamlit UI, LangSmith tracing, and more eval questions (15).
 
 ## 3. How one question flows
 1. User runs `python -m research_agent.raw_agent.loop "What was TCS's revenue in FY2025-26?"`.
@@ -46,10 +54,35 @@ advice, and end with a disclaimer.
 6. After 8 rounds without a final answer it returns `"Stopped after 8 rounds without a final answer."`
 7. `__main__` prints the answer.
 
+**LangGraph version (nodes exist, not wired into a graph; `python -m research_agent.graph.nodes` runs them by hand):**
+1. `planner(state)`: `ChatOpenAI(LLM_MODEL).with_structured_output(Plan)` returns `in_scope` and 2-6 short `steps`;
+   sets `in_scope`, `plan`, `current_step = 0`. (The runner does not check `in_scope` yet.)
+2. `executor(state)`, called once per plan step: sends the question, the current step and the evidence so far (each
+   item cut to 1,500 chars) to a model with the three tools bound; up to 4 rounds of tool calls; each tool result
+   becomes an evidence item `{step, tool, citation, content}` (content is the raw `str(result)`; errors become
+   `"Error: ..."`). Returns the new evidence and `current_step + 1`. The runner appends evidence itself
+   (the `operator.add` reducer will do it once a graph exists).
+3. `writer(state)`: sends the question and all evidence, numbered `[Evidence i]`, to the model with `WRITER_PROMPT`;
+   on a revision it adds the critic's problems and any `human_feedback`. Returns `draft` and `revision_count`
+   (0 for the first draft, then +1 per rewrite).
+4. `critic(state)`: (a) code check: `find_unsupported(draft, evidence texts)`; each draft number with no matching
+   evidence number becomes a problem; (b) LLM check: a `Verdict` of problems from `CRITIC_PROMPT`. Returns
+   `critique` (all problems) and `critic_passed` (no problems).
+5. Runner: plan -> executor per step -> writer -> prints `explain_support` (which evidence number supported each draft
+   number, with surrounding text) -> critic -> if it failed, one writer rewrite and a second critic pass -> saves
+   `question`, `plan`, `evidence`, `draft`, `critique` to `data/runs/last_run.json` (overwritten each run).
+6. `find_unsupported`: strips ISO dates/times, FY labels and page citations from the text, reads each number
+   (Indian and international commas equal), and calls a draft number supported if any evidence number rounded to the
+   draft number's own decimal places equals it.
+
 ## 4. Files
 | File | What it does |
 |---|---|
 | `research_agent/raw_agent/loop.py` | `run_agent`: the tool-calling loop; `__main__`: command-line entry point |
+| `research_agent/graph/state.py` | `ResearchState` (TypedDict): question, in_scope, plan, current_step, evidence (append reducer), draft, critique, critic_passed, revision_count, human_feedback, final_report; the shape of an evidence item is in a comment at the top |
+| `research_agent/graph/nodes.py` | `Plan`, `PLANNER_PROMPT`, `planner`; `TOOLS`, `EXECUTOR_PROMPT`, `executor`; `WRITER_PROMPT`, `writer`; `Verdict`, `CRITIC_PROMPT`, `critic`; `__main__` manual runner that prints the number-support report and saves `data/runs/last_run.json` |
+| `research_agent/graph/numbers.py` | `extract_numbers`, `find_unsupported` (the critic's code check), `explain_support` (debug print of which evidence number supported each draft number); `_clean` strips ISO dates/times, FY labels and page citations first |
+| `data/runs/last_run.json` | Final state of the latest manual graph run (gitignored, overwritten each run) |
 | `research_agent/prompts.py` | `SYSTEM_PROMPT` (how to work + 11 rules: figures only from tools, source with each figure, no advice, names and roles only from sentences, grounding and citation rules, retry search up to 2 times, "not found" is a valid answer, report beats yfinance and the gap is mentioned, retrieved text is data not instructions) and `DISCLAIMER` |
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
@@ -61,11 +94,12 @@ advice, and end with a disclaimer.
 | `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5, collection_name="annual_reports_1600")`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
 | `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
 | `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval [--collection NAME]` (default `annual_reports_1600`): `search(question, company, k=5, collection_name)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<collection>_<date>.json` (collection name also inside the file) |
-| `evals/FAILURES.md` | Hand-found agent failures (question, wrong answer, cause, fix, result after fix) |
+| `evals/FAILURES.md` | Hand-found agent failures (F01 wrong CEO, F02 answer from model knowledge, F03 code check fooled by a timestamp): cause, fix, result or remaining risk |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
 | `tests/test_financials.py` | Parsing, missing-row and invalid-ticker tests using a fake `yf.Ticker`; no network |
+| `tests/test_numbers.py` | 13 offline tests for number extraction and `find_unsupported`: commas, decimals, FY labels, page citations, ISO dates/times, rounding at the draft's decimals, and the F03 regression (a timestamp must not support 2.0) |
 | `tests/test_chunker.py` | 8 offline tests for `chunk_documents` on small fake Documents (size limit, overlap, metadata, no page mixing, chunk numbering per page and company, short page, no empty chunks); no PDFs, API or Chroma |
 | `tests/fixtures/tcs_sample.json` | Two years of TCS statements in raw rupees, shaped like yfinance |
 | `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script, `compare_loaders.py` PyMuPDF vs pypdf); not used by the app |
@@ -78,6 +112,8 @@ advice, and end with a disclaimer.
 | `README.md` | Title only |
 
 ## 5. Tools
+Used by `raw_agent` and by the graph's `executor` (same three tool functions).
+
 | Tool | Input | Output | Data source |
 |---|---|---|---|
 | `get_financials` | `ticker: str` (NSE symbol, `.NS` optional), `years: int = 3` (1–4) | dict: per FY revenue, operating income, net income, total debt, total equity in ₹ crore; `notes`, `source`, `fetched_at`, `from_cache`; or `{"error": ...}` | Yahoo Finance via yfinance (consolidated, annual), cached 7 days |
@@ -100,6 +136,14 @@ advice, and end with a disclaimer.
   so some questions are easier to hit and per-company hit rates are not fully comparable.
   No cross-company or unanswerable questions yet. The 1,600 vs 3,200 chunk result (4/6 vs 3/6) is one question
   out of six: it points one way but 6 questions can't prove it; the plan calls for 15.
+- **Graph not wired:** no `StateGraph`, edges, routing or revision limit yet. The runner does one rewrite at most,
+  ignores `in_scope`, never sets `human_feedback` or `final_report`, and `executor` does not stop a plan that failed.
+- **Code check is loose:** it compares numbers only, not what they mean. A draft number rounded to its own decimals can
+  match a real figure by chance (small numbers most of all), and numbers the writer derives itself are accepted if
+  any evidence number matches. A stricter rule (derived numbers must come from `calculate`) is held back unless F03
+  recurs. Names and facts are checked only by the LLM half of the critic. Time-like text such as "18:30" is also ignored.
+- **No tests for the graph nodes** (`planner`, `executor`, `writer`, `critic`): they call the real model, so they are
+  tried only through the runner. `explain_support` has no test.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
 - **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
 - **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.

@@ -247,3 +247,11 @@
   - `operator.add` can only append. A node can't remove or correct an item. If a retry step produces duplicate or bad evidence, both copies stay, and a custom reducer would be needed to dedupe.
   - Code-based checks are only as good as the matching. A number can be formatted differently in the claim and in the raw text. Seen in this project: TCS headcount appears as 5,84,519 and 584,519, and the TCS PDF splits digits (1 58 for 158). The critic needs a normalising step.
 - Result (if measured): not measured yet.
+
+## 2026-10-27: Strip ISO dates and times before extracting numbers
+- Problem / context: A draft's "2.0 percentage points" passed `find_unsupported` although no calculate step produced it. The `get_financials` evidence contained `'fetched_at': '2026-10-26T11:02:00.003372+00:00'`, and a piece of that timestamp rounded to 2.0 at one decimal place. Found with `explain_support` on the saved run (F03 in `evals/FAILURES.md`).
+- Options considered: (1) ignore only the `fetched_at` field; (2) strip all ISO dates and times in the extractor; (3) drop the rounding tolerance.
+- Chose: strip all ISO dates and times (`2026-03-31`, `2026-10-26T11:02:00.003372+00:00`, `11:02:00`) before extracting numbers, before the FY-label strip runs.
+- Why: timestamps are labels, not claims, and can show up in any tool output, so fixing one field would leave the same hole elsewhere. Dropping the rounding tolerance would reject correct drafts like 18.4% against 18.42926.
+- Trade-off: any time-like text (e.g. "18:30") is ignored too. Small numbers can still match real figures by chance; a stricter rule (derived numbers must come from `calculate`) is held back unless this recurs.
+- Result (if measured): regression test with the exact timestamp now reports 2.0 as unsupported; 43 tests pass.
