@@ -18,3 +18,13 @@
 - Long-term fix: the Milestone 3 critic's code check (every name and number
   in the draft must appear in the evidence).
 - Result after fix: Re-test cited p. 19; that passage contains ‘Pallia’ (verified with a text check).
+
+## F03: Code check passed a number the writer computed itself (2026-10-27)
+- Draft said "2.0 percentage points"; no calculate step produced it.
+- Cause: extract_numbers read the cache timestamp in get_financials output
+  ('fetched_at': ...T11:02:00.003...) as numbers, and one rounded to 2.0.
+- Found by: freezing the run's evidence and testing the number check on it
+  (explain_support), instead of re-running the model until it repeated.
+- Fix: ignore ISO dates and times when extracting numbers; regression test added.
+- Remaining risk: small numbers can still match real figures by chance;
+  stricter rule (derived numbers must come from calculate) if it recurs.

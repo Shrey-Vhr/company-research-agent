@@ -51,3 +51,18 @@ def test_labels_in_draft_do_not_count_as_claims():
 def test_real_case_two_points_gap_is_unsupported():
     evidence = ["18.42926211796076", "16.435161044764342"]
     assert find_unsupported("2.0 percentage points", evidence) == [2.0]
+
+
+def test_iso_dates_and_times_are_ignored():
+    assert extract_numbers("2026-03-31 revenue 500") == [500.0]
+    assert extract_numbers("at 11:02:00 revenue 500") == [500.0]
+    assert extract_numbers("'fetched_at': '2026-10-26T11:02:00.003372+00:00'") == []
+
+
+def test_timestamp_does_not_support_a_draft_number():
+    evidence = [
+        "'fetched_at': '2026-10-26T11:02:00.003372+00:00'",
+        "18.42926211796076",
+        "16.435161044764342",
+    ]
+    assert find_unsupported("difference of 2.0 percentage points", evidence) == [2.0]
