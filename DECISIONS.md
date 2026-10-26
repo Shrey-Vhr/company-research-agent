@@ -229,3 +229,21 @@
   annual report as the official source (prompt rule 10).
 - Trade-off: answers show two numbers instead of one, which is less tidy but
   honest; garbled TCS table headers mean the year column must be checked by eye.
+
+## 2026-10-26: `evidence` uses an append reducer, and each item keeps the raw tool output
+- Problem / context: In the LangGraph state, the executor visits one plan step at a time and each visit finds new facts. A LangGraph node returns only the keys it changed, and by default a returned key overwrites the old value. With a plain `list`, every executor step would replace the evidence from earlier steps. The critic also needs to check each claim in the draft against the numbers the tools returned. It can't do that if evidence is only a summary.
+- Options considered:
+  1. Plain `list[dict]` with no reducer. Each node reads the old list, appends, and returns the whole list.
+  2. `Annotated[list[dict], operator.add]`. Each node returns only its new items and LangGraph concatenates them onto the existing list.
+  3. Store only a short summary or the extracted fact per item.
+  4. Store each item as `{step, tool, citation, content}`, where `content` is the raw tool output.
+- Chose: Options 2 and 4 together. `evidence: Annotated[list[dict], operator.add]`, and each item holds `step`, `tool`, `citation` and the unmodified `content` text from the tool.
+- Why:
+  - The reducer makes appending the default. A node returns `{"evidence": [new_item]}` and the old items stay. Option 1 depends on every node remembering to copy the old list, and one forgotten copy silently wipes earlier evidence.
+  - Raw `content` lets the critic verify claims in code instead of asking an LLM. For a claim like "TCS revenue was X", plain Python can check that the number appears in the `content` of an item with the matching `tool` and `citation`. A summary written by the model can't be checked this way, because a hallucinated summary would pass its own check.
+  - `step` and `citation` tie each fact back to the plan step that produced it and to its source, which the report needs for grounded citations.
+- Trade-off:
+  - Raw outputs are long, so evidence takes more memory and state size. If it is ever passed to a model, it costs more tokens, so I may need to trim what goes into prompts.
+  - `operator.add` can only append. A node can't remove or correct an item. If a retry step produces duplicate or bad evidence, both copies stay, and a custom reducer would be needed to dedupe.
+  - Code-based checks are only as good as the matching. A number can be formatted differently in the claim and in the raw text. Seen in this project: TCS headcount appears as 5,84,519 and 584,519, and the TCS PDF splits digits (1 58 for 158). The critic needs a normalising step.
+- Result (if measured): not measured yet.
