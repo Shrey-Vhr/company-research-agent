@@ -3,7 +3,11 @@
 - Chose: 800, because retrieval hit rate was highest (see evals/retrieval.md)
 - Trade-off: larger chunks cost more tokens per query
 
-## - - Why LangChain `ChatOpenAI` with hand-written loops instead of prebuilt agents.
+## 2026-10-13: Why LangChain `ChatOpenAI` with hand-written loops instead of prebuilt agents.
+- Context: I only knew LangChain and LangGraph, so all LLM calls use `ChatOpenAI` with `bind_tools`.
+- Chose: write the tool loop by hand (no `create_agent` or `AgentExecutor`).
+- Why: so I understand what prebuilt agents hide. That hand-written loop became the `raw_agent` baseline.
+
 - Why Streamlit for the UI (section 3).
 
 ## Explore the data. For TCS.NS, INFY.NS and WIPRO.NS, print the rows you need. Check one revenue number against that company's annual report. Write any differences in DECISIONS.md.
@@ -263,3 +267,43 @@
 - Why: a rewrite can't create evidence that was never retrieved, so failing the draft only burns revisions, time and tokens.
 - Trade-off: the critic may now pass a draft that says "not found" when better retrieval could have found the answer; that is a retrieval problem, tracked separately (hybrid search idea). In the after-run, the answer came from the Board of Directors list rather than a sentence, and the critic accepted it: a list row pairing a name and title is more reliable than a scrambled signature block, but the critic is now less strict about the names rule.
 - Result: before 64.4 s, 54.6K tokens, $0.0062, 4 searches, 3 writer + 3 critic runs (2 revisions, limit hit), critic_passed false. After 30.5 s, 27.4K tokens, $0.0033, 2 searches, 2 writer + 2 critic runs (1 revision), critic_passed true. Answer: Srinivas Pallia, CEO & Managing Director, from the Board of Directors list.
+
+## 2026-10-27: LangGraph instead of the raw loop
+- Problem / context: The raw agent is one model in an 8-round loop that does planning, searching, writing and self-checking in one conversation. Failures F01 and F02 came from this: nothing checked the answer after the model wrote it, and there was no place for a human to stop a bad answer.
+- Options considered: (a) keep the raw loop and add a check at the end; (b) LangGraph with separate nodes (planner, executor, writer, critic, human review).
+- Chose: (b). The raw agent stays in raw_agent/ as the baseline.
+- Why: I built both versions. With nodes, I could test each step alone (planner, then executor, then writer and critic). The checkpointer made pause, resume and restart possible, which the raw loop couldn't do. LangSmith shows each node separately, which is how I found the wasteful critic loop. A critic and a human approval step need control flow (loops back, pauses) that is explicit in a graph and messy in one loop.
+- Trade-off: more code and more model calls per question. The Wipro CEO run took 64 s before the critic fix; the raw loop has no critic call. F04 also showed that rules in the old prompt did not carry over to the new node prompts.
+- Result (if measured): none; raw vs graph not compared on the same questions yet.
+
+## 2026-10-27: The critic has a code check and an LLM check
+- Problem / context: The writer can put in numbers or facts the evidence does not support. F03 and F04 showed that each kind of check misses something the other catches.
+- Options considered: (a) LLM check only; (b) code check only; (c) both in one node.
+- Chose: (c). The code check requires every number in the draft to appear in the evidence (find_unsupported). The LLM check covers names, facts, citations, advice and the disclaimer.
+- Why: numbers can be checked exactly, so a model should not guess. Names, roles and "does this page say this" cannot be checked by matching. F04 got through because the code check covers numbers only and the LLM check missed a signature block.
+- Trade-off: the code check is loose (F03: a timestamp matched 2.0; small numbers can match by chance). The LLM check is slow (one call took 23 s in the trace) and is only as strict as its prompt.
+- Result (if measured): F03 fixed with a regression test (43 tests pass); F04 re-test: critic flagged table/signature-only evidence.
+
+## 2026-10-27: Revision limit of 2, and what happens at the limit
+- Problem / context: Without a limit, a draft the critic keeps failing would loop forever.
+- Options considered: (a) limit 1; (b) limit 2; (c) no limit, rely on the recursion limit.
+- Chose: (b), MAX_REVISIONS = 2 in build.py. At the limit the run goes to human_review (or straight to finalize with auto_approve), and finalize adds a note listing the problems the critic still had.
+- Why: Most fixable problems (a wrong number, a missing citation) are fixed in one or two rewrites; a third rarely helps and costs another writer + critic round. 2 balances quality against time and tokens.
+- Trade-off: in the Wipro CEO trace the limit was reached with problems no rewrite could fix, costing about 40 s and half the tokens (see "Critic accepts drafts that honestly state evidence limits"). The limit bounds the cost but does not avoid it.
+- Result (if measured): before the critic fix, 3 writer + 3 critic runs with the limit hit; after, 1 revision and critic_passed true.
+
+## 2026-10-27: interrupt() at the top of human_review
+- Problem / context: The human must see the draft and approve or ask for changes before the report is final. LangGraph resumes a paused node by running it again from its first line.
+- Options considered: (a) interrupt() as the first thing in human_review; (b) interrupt() after other work in the node.
+- Chose: (a). The node only calls interrupt() with the draft, critic_passed and critique, then returns human_feedback.
+- Why: when the node re-runs on resume, anything above interrupt() runs twice. With nothing above it, the re-run is harmless. The pause inside the node lets me pass the draft out and the decision back in one call.
+- Trade-off: the node must stay free of side effects (no model calls, no writes) before the interrupt. On "revise" it also clears critique so the writer does not get old critic problems with the new feedback.
+- Result (if measured): none.
+
+## 2026-10-27: SQLite checkpointer instead of in-memory
+- Problem / context: The in-memory checkpointer lost a paused run when the program exited, so a draft waiting for human review could not be resumed later.
+- Options considered: (a) InMemorySaver; (b) SqliteSaver at data/checkpoints.sqlite; (c) a server database such as Postgres.
+- Chose: (b). build_graph(checkpointer=None) defaults to it; run.py prints the thread_id and has --resume <thread_id>.
+- Why: a file next to the project keeps state across restarts with no server. The SqliteSaver docs show the sqlite3.connect(..., check_same_thread=False) pattern, which I used.
+- Trade-off: SqliteSaver is meant for light, single-process use; checkpoints pile up in the file and nothing deletes old threads. Postgres would be the next step if this ever served several users.
+- Result (if measured): full test on 2026-10-27. I started "Who is the CEO of Wipro?", stopped it at the approval prompt with Ctrl+C, and ran --resume a359a65b-cdda-470c-bceb-310abfd1df8f. It showed the same draft with no new tool calls, then finished after I approved.
