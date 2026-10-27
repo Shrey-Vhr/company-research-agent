@@ -193,6 +193,19 @@ def critic(state: ResearchState) -> dict:
     return {"critique": problems, "critic_passed": len(problems) == 0}
 
 
+def refuse(state: ResearchState) -> dict:
+    return {"final_report": "I can't help with that: I only research facts about "
+            "TCS, Infosys and Wipro from their financials and FY2025-26 annual "
+            "reports, and I don't give investment advice or predictions.\n\n" + DISCLAIMER}
+
+
+def finalize(state: ResearchState) -> dict:
+    report = state["draft"]
+    if not state["critic_passed"]:
+        report += ("\n\nNote: an automatic check found problems it could not fix: "
+                   + "; ".join(state["critique"]))
+    return {"final_report": report}
+
 
 if __name__ == "__main__":
     state = {"question": "Compare TCS and Infosys net margin in FY2025-26", "evidence": []}
