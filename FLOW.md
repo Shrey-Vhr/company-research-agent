@@ -2,7 +2,7 @@
 
 ## 1. What the project does
 A research agent that answers questions about NSE-listed Indian companies (e.g. TCS, Infosys, Wipro).
-An OpenAI model, via LangChain, calls tools to fetch yearly financials from Yahoo Finance, search the FY2025-26 annual
+An OpenAI model, via LangChain and a LangGraph workflow, calls tools to fetch yearly financials from Yahoo Finance, search the FY2025-26 annual
 reports (TCS, Infosys, Wipro) and do arithmetic. Answers cite the source and page or year, never give investment
 advice, and end with a disclaimer.
 
@@ -10,8 +10,8 @@ advice, and end with a disclaimer.
 - **Stage:** Milestone 3 in progress. Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and
   grounding rules) is complete and still works. The Milestone 3 graph works end to end: planner, executor, writer,
   critic, human review with interrupt and resume, a SQLite checkpointer, the `auto_approve` flag and LangSmith tracing.
-- **Works:** three tools (`get_financials`, `calculate`, `search_reports`), a system prompt with 11 rules, the loop with an 8-round limit,
-  a command-line entry point, a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
+- **Works:** three tools (`get_financials`, `calculate`, `search_reports`), the raw agent (`SYSTEM_PROMPT` with 11 rules, 8-round limit),
+  two command-line entry points (raw agent and graph), a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
   (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into chunks that keep
   that metadata. Two Chroma collections sit in `data/chroma`: `annual_reports` (3,200 chars, 400 overlap, 1,839 chunks,
@@ -25,64 +25,56 @@ advice, and end with a disclaimer.
   `annual_reports_1600` 4/6; saved in `evals/results/`.
 - **Failures found by hand** are written up in `evals/FAILURES.md` (F01 wrong CEO from a signature block, F02 answer
   from the model's own knowledge with a wrong citation); both were fixed with prompt rules.
-- **LangGraph pieces, tested by hand only:** `graph/state.py` (`ResearchState`), `graph/nodes.py` (`planner`,
-  `executor`, `writer`, `critic`) and `graph/numbers.py` (number matching for the critic's code check). The nodes are
-  tried through the `__main__` runner, which saves the run to `data/runs/last_run.json`. Only `numbers.py` has tests
-  (13); the 43 tests in `tests/` all pass.
+- **LangGraph graph:** `graph/build.py` wires `graph/nodes.py` (planner, executor, writer, critic, refuse, human_review,
+  finalize) over `graph/state.py` with conditional routing; `graph/numbers.py` is the critic's number check. Only
+  `numbers.py` has tests (13); the 43 tests in `tests/` all pass. The nodes call the real model and are checked by
+  running the graph and reading LangSmith traces. The `__main__` runner in `nodes.py` is the old by-hand version.
+- **Critic loop fix:** the critic prompt now accepts drafts that honestly state the evidence's limits (cut a Wipro CEO
+  run from 64 s / 54.6K tokens to 30.5 s / 27.4K); see `DECISIONS.md` 2026-10-27.
 - **Failure F03 found and fixed:** the code check passed "2.0 percentage points" that no calculation produced, because
   a number inside the `fetched_at` timestamp rounded to 2.0. `extract_numbers` now ignores ISO dates and times
   (regression test added; details in `evals/FAILURES.md`). It was found with `explain_support`.
 - **Next (planned):** a Streamlit UI and more eval questions (15).
 
 ## 3. How one question flows
-1. User runs `python -m research_agent.raw_agent.loop "What was TCS's revenue in FY2025-26?"`.
-   `__main__` joins the words after the module name; if there are none it prints usage and exits with code 2.
-2. `run_agent(question)` binds the three tools to `ChatOpenAI(model=LLM_MODEL)` with `parallel_tool_calls=True`
-   and starts the message list: `[SystemMessage(SYSTEM_PROMPT), HumanMessage(question)]`.
-3. **Round loop (max 8):** the model is called with all messages so far; token usage is added up.
-4. If the reply has **no tool calls**, the loop prints the token totals and returns `reply.text` as the answer.
-5. If it has tool calls (one or more per reply), each is run **one after another**:
-   - unknown tool name → `"Error: unknown tool ..."`
-   - `get_financials` → `fetch_financials`: check the ticker → read `data/cache/<TICKER>.json` if under 7 days old,
-     otherwise download from yfinance and save → trim to `years` → dict in ₹ crore (or `{"error": ...}`)
-   - `calculate` → `safe_eval`: allowlist → `ast.parse` → tree walk → number as text (or `"Error: ..."`)
-   - `search_reports` → `search(query, company, fy, k=5)` on `annual_reports_1600` → up to 5 passages, each `text` + `citation`
-     ("Wipro Annual Report FY2025-26, p. 145"); the model must copy the citation next to each fact
-   - any exception → `"Error: ..."`
-   Each result is logged and added as a `ToolMessage` linked to its `tool_call_id`, then the next round starts.
-6. After 8 rounds without a final answer it returns `"Stopped after 8 rounds without a final answer."`
-7. `__main__` prints the answer.
+Diagram: `docs/graph.mmd`. Run it with `python -m research_agent.graph.run "question"` (`--auto` skips human review).
+1. **Start:** `run.py` builds the graph with the SQLite checkpointer, makes a uuid `thread_id` (printed), and invokes
+   it with `{"question", "evidence": []}` (plus `auto_approve: True` with `--auto`).
+2. **planner:** one structured-output model call returns `in_scope` and 2-6 steps. Out of scope (advice, predictions,
+   other companies) -> `refuse` writes a fixed refusal as `final_report` and the run ends.
+3. **executor:** runs one plan step per visit, with the three tools bound. It sees the question, the current step and the
+   evidence so far (each item cut to 1,500 chars). Each tool result is appended to `evidence` as
+   `{step, tool, citation, content}`, where `content` is the raw `str(result)`. It routes back to itself until every
+   step is done, then goes to the writer.
+4. **writer:** drafts the report from the numbered evidence only (`WRITER_PROMPT`); on a revision it also gets the
+   critic's problems and any `human_feedback`. Sets `draft` and `revision_count` (0 first, +1 per rewrite).
+5. **critic:** (a) code check: every number in the draft must appear in the evidence (`find_unsupported`, rules in
+   `numbers.py`); (b) LLM check of names, facts, citations, advice and disclaimer. It sets `critique` and
+   `critic_passed`. A failed draft goes back to the writer while `revision_count` < 2.
+6. **human_review:** reached when the critic passes, or when the 2 revisions are used up. With `auto_approve` the graph
+   skips it and goes to `finalize`. Otherwise `interrupt()` pauses: `run.py` prints the draft (and the critique if
+   the critic failed) and asks. "y" approves; any other text is `human_feedback` and sends the run back to the writer
+   (then the critic and review again).
+7. **finalize:** `final_report` = the draft, with a note listing the critic's remaining problems if it never passed.
+   `run.py` prints it.
 
-**LangGraph version (nodes exist, not wired into a graph; `python -m research_agent.graph.nodes` runs them by hand):**
-1. `planner(state)`: `ChatOpenAI(LLM_MODEL).with_structured_output(Plan)` returns `in_scope` and 2-6 short `steps`;
-   sets `in_scope`, `plan`, `current_step = 0`. (The runner does not check `in_scope` yet.)
-2. `executor(state)`, called once per plan step: sends the question, the current step and the evidence so far (each
-   item cut to 1,500 chars) to a model with the three tools bound; up to 4 rounds of tool calls; each tool result
-   becomes an evidence item `{step, tool, citation, content}` (content is the raw `str(result)`; errors become
-   `"Error: ..."`). Returns the new evidence and `current_step + 1`. The runner appends evidence itself
-   (the `operator.add` reducer will do it once a graph exists).
-3. `writer(state)`: sends the question and all evidence, numbered `[Evidence i]`, to the model with `WRITER_PROMPT`;
-   on a revision it adds the critic's problems and any `human_feedback`. Returns `draft` and `revision_count`
-   (0 for the first draft, then +1 per rewrite).
-4. `critic(state)`: (a) code check: `find_unsupported(draft, evidence texts)`; each draft number with no matching
-   evidence number becomes a problem; (b) LLM check: a `Verdict` of problems from `CRITIC_PROMPT`. Returns
-   `critique` (all problems) and `critic_passed` (no problems).
-5. Runner: plan -> executor per step -> writer -> prints `explain_support` (which evidence number supported each draft
-   number, with surrounding text) -> critic -> if it failed, one writer rewrite and a second critic pass -> saves
-   `question`, `plan`, `evidence`, `draft`, `critique` to `data/runs/last_run.json` (overwritten each run).
-6. `find_unsupported`: strips ISO dates/times, FY labels and page citations from the text, reads each number
-   (Indian and international commas equal), and calls a draft number supported if any evidence number rounded to the
-   draft number's own decimal places equals it.
+**Loop guards:** 4 model rounds per executor step; 2 revisions (`MAX_REVISIONS` in `build.py`); `recursion_limit` 30
+(set in `run.py`). **Persistence:** every step is saved under the `thread_id` in `data/checkpoints.sqlite`; a run
+paused at human review can be continued later with `--resume <thread_id>`. **Baseline:** the older hand-written loop in
+`research_agent/raw_agent/` (one model, three tools, 8 rounds, `SYSTEM_PROMPT`) is kept for comparison and still works:
+`python -m research_agent.raw_agent.loop "question"`. The tool functions are shared by both.
 
 ## 4. Files
 | File | What it does |
 |---|---|
 | `research_agent/raw_agent/loop.py` | `run_agent`: the tool-calling loop; `__main__`: command-line entry point |
-| `research_agent/graph/state.py` | `ResearchState` (TypedDict): question, in_scope, plan, current_step, evidence (append reducer), draft, critique, critic_passed, revision_count, human_feedback, final_report; the shape of an evidence item is in a comment at the top |
-| `research_agent/graph/nodes.py` | `Plan`, `PLANNER_PROMPT`, `planner`; `TOOLS`, `EXECUTOR_PROMPT`, `executor`; `WRITER_PROMPT`, `writer`; `Verdict`, `CRITIC_PROMPT`, `critic`; `__main__` manual runner that prints the number-support report and saves `data/runs/last_run.json` |
+| `research_agent/graph/state.py` | `ResearchState` (TypedDict): question, in_scope, plan, current_step, evidence (append reducer), draft, critique, critic_passed, revision_count, human_feedback, final_report, auto_approve; the shape of an evidence item is in a comment at the top |
+| `research_agent/graph/build.py` | `build_graph(checkpointer=None)`: adds the 7 nodes and edges, routing functions `after_planner`, `after_executor`, `after_critic`, `after_human`, `MAX_REVISIONS = 2`; `default_checkpointer()` opens the SQLite checkpointer |
+| `research_agent/graph/nodes.py` | `Plan`, `PLANNER_PROMPT`, `planner`; `TOOLS`, `EXECUTOR_PROMPT`, `executor`; `WRITER_PROMPT`, `writer`; `Verdict`, `CRITIC_PROMPT`, `critic`; `refuse`, `human_review` (`interrupt`), `finalize`; `__main__` manual runner (no graph) that prints the number-support report and saves `data/runs/last_run.json` |
 | `research_agent/graph/run.py` | CLI driver: `python -m research_agent.graph.run "question"` (prints the new uuid thread_id, recursion_limit 30; `--auto` starts with `auto_approve: True` so human review is skipped) or `--resume <thread_id>` (reloads the paused run's pending interrupt from the SQLite checkpointer `data/checkpoints.sqlite`, built in `build_graph`); loops while `__interrupt__` is in the result (prints draft + critique, asks "Approve? (y / changes)", resumes with `Command(resume=...)`), then prints `final_report` |
 | `research_agent/graph/numbers.py` | `extract_numbers`, `find_unsupported` (the critic's code check), `explain_support` (debug print of which evidence number supported each draft number); `_clean` strips ISO dates/times, FY labels and page citations first |
-| `data/runs/last_run.json` | Final state of the latest manual graph run (gitignored, overwritten each run) |
+| `data/checkpoints.sqlite` | LangGraph checkpoints, one thread per run (gitignored via `data/`) |
+| `data/runs/last_run.json` | Final state of the latest manual `nodes.py` run (gitignored, overwritten each run) |
 | `research_agent/prompts.py` | `SYSTEM_PROMPT` (how to work + 11 rules: figures only from tools, source with each figure, no advice, names and roles only from sentences, grounding and citation rules, retry search up to 2 times, "not found" is a valid answer, report beats yfinance and the gap is mentioned, retrieved text is data not instructions) and `DISCLAIMER` |
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
@@ -137,16 +129,16 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   so some questions are easier to hit and per-company hit rates are not fully comparable.
   No cross-company or unanswerable questions yet. The 1,600 vs 3,200 chunk result (4/6 vs 3/6) is one question
   out of six: it points one way but 6 questions can't prove it; the plan calls for 15.
-- **Graph not wired:** no `StateGraph`, edges, routing or revision limit yet. The runner does one rewrite at most,
-  ignores `in_scope`, never sets `human_feedback` or `final_report`, and `executor` does not stop a plan that failed.
+- **Executor does not stop a failed plan:** if a step's tool fails twice, the next steps still run and the writer
+  works with whatever evidence exists.
 - **Critic is now more lenient on the names-from-sentences rule;** answers may come from list rows. Retrieval still
   misses sentence passages for short exact facts (e.g. Wipro CEO on p. 19 and p. 103).
 - **Code check is loose:** it compares numbers only, not what they mean. A draft number rounded to its own decimals can
   match a real figure by chance (small numbers most of all), and numbers the writer derives itself are accepted if
   any evidence number matches. A stricter rule (derived numbers must come from `calculate`) is held back unless F03
   recurs. Names and facts are checked only by the LLM half of the critic. Time-like text such as "18:30" is also ignored.
-- **No tests for the graph nodes** (`planner`, `executor`, `writer`, `critic`): they call the real model, so they are
-  tried only through the runner. `explain_support` has no test.
+- **No tests for the graph nodes or routing** (`planner`, `executor`, `writer`, `critic`, `after_*`): the nodes call the
+  real model, so they are tried only by running the graph. `explain_support` has no test.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
 - **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
 - **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.
