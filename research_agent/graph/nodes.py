@@ -13,6 +13,8 @@ from research_agent.tools.reports import search_reports
 from research_agent.graph.state import ResearchState
 from research_agent.graph.numbers import find_unsupported, explain_support
 
+from langgraph.types import interrupt
+
 load_dotenv()
 
 class Plan(BaseModel):
@@ -205,6 +207,17 @@ def finalize(state: ResearchState) -> dict:
         report += ("\n\nNote: an automatic check found problems it could not fix: "
                    + "; ".join(state["critique"]))
     return {"final_report": report}
+
+
+def human_review(state: ResearchState) -> dict:
+    decision = interrupt({
+        "draft": state["draft"],
+        "critic_passed": state["critic_passed"],
+        "critique": state["critique"],
+    })
+    if decision.get("action") == "approve":
+        return {"human_feedback": ""}
+    return {"human_feedback": decision.get("feedback", ""), "critique": []}
 
 
 if __name__ == "__main__":
