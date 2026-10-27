@@ -1,10 +1,14 @@
+import sqlite3
+from pathlib import Path
+
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from research_agent.graph.nodes import critic, executor, finalize, planner, refuse, writer, human_review
 from research_agent.graph.state import ResearchState
-from langgraph.checkpoint.memory import InMemorySaver
 
 MAX_REVISIONS = 2
+CHECKPOINT_DB = Path("data/checkpoints.sqlite")
 
 
 def after_planner(state: ResearchState) -> str:
@@ -25,7 +29,15 @@ def after_human(state: ResearchState) -> str:
     return "writer" if state["human_feedback"] else "finalize"
 
 
-def build_graph():
+def default_checkpointer():
+    CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(CHECKPOINT_DB, check_same_thread=False)
+    return SqliteSaver(conn)
+
+
+def build_graph(checkpointer=None):
+    if checkpointer is None:
+        checkpointer = default_checkpointer()
     g = StateGraph(ResearchState)
     g.add_node("planner", planner)
     g.add_node("executor", executor)
@@ -43,7 +55,7 @@ def build_graph():
     g.add_conditional_edges("human_review", after_human, ["writer", "finalize"])
     g.add_edge("refuse", END)
     g.add_edge("finalize", END)
-    return g.compile(checkpointer=InMemorySaver())
+    return g.compile(checkpointer=checkpointer)
 
 
 # To view flowchart.. paste the output of the below on mermaid.live
