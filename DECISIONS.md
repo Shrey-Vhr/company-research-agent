@@ -255,3 +255,11 @@
 - Why: timestamps are labels, not claims, and can show up in any tool output, so fixing one field would leave the same hole elsewhere. Dropping the rounding tolerance would reject correct drafts like 18.4% against 18.42926.
 - Trade-off: any time-like text (e.g. "18:30") is ignored too. Small numbers can still match real figures by chance; a stricter rule (derived numbers must come from `calculate`) is held back unless this recurs.
 - Result (if measured): regression test with the exact timestamp now reports 2.0 as unsupported; 43 tests pass.
+
+## 2026-10-27: Critic accepts drafts that honestly state evidence limits
+- Problem / context: For "Who is the CEO of Wipro?", the critic loop spent 2 revisions (about 40 seconds and half the tokens) on missing evidence, which a rewrite can't fix. Found by the LangSmith trace: 3 writer and 3 critic runs, critic_passed false every time, and one critic model call of 23 s. The executor searched 4 times but never retrieved a passage stating the CEO in a sentence (p. 19 and p. 103 have one).
+- Options considered: (a) lower MAX_REVISIONS to 1; (b) add a "fixable" field to the critic's verdict and send unfixable problems straight to human review; (c) route evidence gaps back to the executor for more searching; (d) change the critic prompt to accept drafts that honestly state the evidence's limits, and flag only problems a rewrite can fix.
+- Chose: (d), the simplest change. (b) is the stronger fix if this recurs.
+- Why: a rewrite can't create evidence that was never retrieved, so failing the draft only burns revisions, time and tokens.
+- Trade-off: the critic may now pass a draft that says "not found" when better retrieval could have found the answer; that is a retrieval problem, tracked separately (hybrid search idea). In the after-run, the answer came from the Board of Directors list rather than a sentence, and the critic accepted it: a list row pairing a name and title is more reliable than a scrambled signature block, but the critic is now less strict about the names rule.
+- Result: before 64.4 s, 54.6K tokens, $0.0062, 4 searches, 3 writer + 3 critic runs (2 revisions, limit hit), critic_passed false. After 30.5 s, 27.4K tokens, $0.0033, 2 searches, 2 writer + 2 critic runs (1 revision), critic_passed true. Answer: Srinivas Pallia, CEO & Managing Director, from the Board of Directors list.

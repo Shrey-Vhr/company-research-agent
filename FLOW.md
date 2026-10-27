@@ -8,8 +8,8 @@ advice, and end with a disclaimer.
 
 ## 2. Current status
 - **Stage:** Milestone 3 in progress. Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and
-  grounding rules) is complete and still works. The LangGraph version has a state, four node functions (planner,
-  executor, writer, critic) and a manual runner, but **no graph yet**: no `StateGraph`, edges, routing or revision loop.
+  grounding rules) is complete and still works. The Milestone 3 graph works end to end: planner, executor, writer,
+  critic, human review with interrupt and resume, a SQLite checkpointer, the `auto_approve` flag and LangSmith tracing.
 - **Works:** three tools (`get_financials`, `calculate`, `search_reports`), a system prompt with 11 rules, the loop with an 8-round limit,
   a command-line entry point, a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
@@ -32,8 +32,7 @@ advice, and end with a disclaimer.
 - **Failure F03 found and fixed:** the code check passed "2.0 percentage points" that no calculation produced, because
   a number inside the `fetched_at` timestamp rounded to 2.0. `extract_numbers` now ignores ISO dates and times
   (regression test added; details in `evals/FAILURES.md`). It was found with `explain_support`.
-- **Next (planned):** build the graph (nodes, edges, routing for out-of-scope, executor loop, critic -> writer
-  revision loop with a limit, human feedback), then a Streamlit UI, LangSmith tracing, and more eval questions (15).
+- **Next (planned):** a Streamlit UI and more eval questions (15).
 
 ## 3. How one question flows
 1. User runs `python -m research_agent.raw_agent.loop "What was TCS's revenue in FY2025-26?"`.
@@ -106,6 +105,7 @@ advice, and end with a disclaimer.
 | `playground/*.py` | Learning experiments (yfinance rows, a first tool-calling script, `compare_loaders.py` PyMuPDF vs pypdf); not used by the app |
 | `data/reports/` | The three annual-report PDFs (gitignored; sources in `docs/DATA_SOURCES.md`) |
 | `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
+| `docs/graph.mmd` | Mermaid flowchart of the graph (paste into mermaid.live) |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
 | `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including ones for later stages (LangGraph, Streamlit) |
@@ -139,6 +139,8 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   out of six: it points one way but 6 questions can't prove it; the plan calls for 15.
 - **Graph not wired:** no `StateGraph`, edges, routing or revision limit yet. The runner does one rewrite at most,
   ignores `in_scope`, never sets `human_feedback` or `final_report`, and `executor` does not stop a plan that failed.
+- **Critic is now more lenient on the names-from-sentences rule;** answers may come from list rows. Retrieval still
+  misses sentence passages for short exact facts (e.g. Wipro CEO on p. 19 and p. 103).
 - **Code check is loose:** it compares numbers only, not what they mean. A draft number rounded to its own decimals can
   match a real figure by chance (small numbers most of all), and numbers the writer derives itself are accepted if
   any evidence number matches. A stricter rule (derived numbers must come from `calculate`) is held back unless F03
