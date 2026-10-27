@@ -20,9 +20,11 @@ def after_executor(state: ResearchState) -> str:
 
 
 def after_critic(state: ResearchState) -> str:
-    if state["critic_passed"] or state["revision_count"] >= MAX_REVISIONS:
-        return "human_review"
-    return "writer"
+    if not state["critic_passed"] and state["revision_count"] < MAX_REVISIONS:
+        return "writer"
+    if state.get("auto_approve"):
+        return "finalize"
+    return "human_review"
 
 
 def after_human(state: ResearchState) -> str:
@@ -51,7 +53,7 @@ def build_graph(checkpointer=None):
     g.add_conditional_edges("planner", after_planner, ["executor", "refuse"])
     g.add_conditional_edges("executor", after_executor, ["executor", "writer"])
     g.add_edge("writer", "critic")
-    g.add_conditional_edges("critic", after_critic, ["human_review", "writer"])
+    g.add_conditional_edges("critic", after_critic, ["writer", "human_review", "finalize"])
     g.add_conditional_edges("human_review", after_human, ["writer", "finalize"])
     g.add_edge("refuse", END)
     g.add_edge("finalize", END)

@@ -21,3 +21,4 @@ class ResearchState(TypedDict):
     revision_count: int                # how many times the writer has revised
     human_feedback: str                # your change request, empty if none
     final_report: str                  # what the user sees at the end
+    auto_approve: bool                 # True = skip human review (used by evals)
