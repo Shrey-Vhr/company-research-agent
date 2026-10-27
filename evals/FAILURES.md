@@ -28,3 +28,14 @@
 - Fix: ignore ISO dates and times when extracting numbers; regression test added.
 - Remaining risk: small numbers can still match real figures by chance;
   stricter rule (derived numbers must come from calculate) if it recurs.
+
+## F04: F01 came back after the LangGraph rebuild (2026-10-27)
+- Question: "Who is the CEO of Wipro?"; answer: Anand Subramanian (auditor), p. 184.
+- Cause: the F01/F02 rules were in the Milestone 1 system prompt only; the
+  new graph prompts (executor, writer, critic) never got them.
+- Also missed by: the critic (code check covers numbers only; LLM check didn't
+  spot the signature block) and by human review (approved without checking).
+- Fix: names-from-sentences and retry rules ported to executor, writer and critic.
+- Lesson: when rebuilding, re-test every old failure. Milestone 5 evals must
+  include an F01-style question so this is caught automatically.
+- result: “Re-test: correct name (Srinivas Pallia); writer flagged that evidence was table/signature only; critic flagged it too. Sentence passages (p. 19, 103) not retrieved: known retrieval limit.”
