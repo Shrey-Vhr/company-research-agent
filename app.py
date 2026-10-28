@@ -79,8 +79,9 @@ def footer():
 st.set_page_config(page_title="Company Research Agent")
 graph = get_graph()
 
+# On page load, pick up a run from the URL (?thread=...) if there is one
 if "thread_id" not in st.session_state:
-    st.session_state.thread_id = None
+    st.session_state.thread_id = st.query_params.get("thread")
 
 # 1. Header
 st.title("Company Research Agent")
@@ -107,6 +108,7 @@ if st.button("Run", type="primary"):
     else:
         count_run()
         st.session_state.thread_id = str(uuid.uuid4())
+        st.query_params["thread"] = st.session_state.thread_id  # so a refresh can find this run
         with st.spinner("Researching... this takes about 30 seconds"):
             safe_invoke({"question": question.strip(), "evidence": []})
 
