@@ -99,6 +99,7 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
 | `docs/graph.mmd` | Mermaid flowchart of the graph (paste into mermaid.live) |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
+| `app.py` | Streamlit UI: question box, Run, shows plan/evidence/draft, Approve and Request changes (resume the graph), final report download. Daily cap of 20 runs counted in `data/usage.sqlite`; graph errors show only the exception type, full traceback goes to the terminal |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
 | `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including ones for later stages (LangGraph, Streamlit) |
 | `CLAUDE.md` / `DECISIONS.md` / `FLOW.md` | Working rules / decision log / this file |
@@ -125,6 +126,8 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   converted from USD at the yearly average rate, so its figures are approximate. FY labels assume a March year-end.
 - **Repeatability:** the cache expires after 7 days, so eval answers can change when Yahoo updates its data.
 - **Calculator:** no `**`, so it can't do CAGR.
+- **Daily cap is per machine, not per user:** the 20-run count in `data/usage.sqlite` is shared by everyone using the
+  app, and a run that fails still counts.
 - **Retrieval eval is small and uneven:** 6 questions; `answer_pages` ranges from 1 page (r04, r05) to 8 (r03),
   so some questions are easier to hit and per-company hit rates are not fully comparable.
   No cross-company or unanswerable questions yet. The 1,600 vs 3,200 chunk result (4/6 vs 3/6) is one question

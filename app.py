@@ -1,10 +1,16 @@
+import sqlite3
+import traceback
 import uuid
+from datetime import date
+from pathlib import Path
 
 import streamlit as st
 from langgraph.types import Command
 
 from research_agent.graph.build import build_graph
 
+MAX_RUNS_PER_DAY = 20
+USAGE_DB = Path("data/usage.sqlite")
 GITHUB_URL = "https://github.com/your-username/Company-Research-Agent"  # change to your repo
 DISCLAIMER = "This is for information only and is not investment advice."
 
@@ -23,6 +29,41 @@ def get_graph():
 
 def run_config():
     return {"configurable": {"thread_id": st.session_state.thread_id}, "recursion_limit": 30}
+
+
+def usage_db():
+    """Open the usage database, creating the folder and table on first use."""
+    USAGE_DB.parent.mkdir(exist_ok=True)
+    conn = sqlite3.connect(USAGE_DB)
+    conn.execute("CREATE TABLE IF NOT EXISTS usage (date TEXT PRIMARY KEY, count INTEGER NOT NULL)")
+    return conn
+
+
+def runs_today():
+    with usage_db() as conn:
+        row = conn.execute("SELECT count FROM usage WHERE date = ?", (date.today().isoformat(),)).fetchone()
+    return row[0] if row else 0
+
+
+def count_run():
+    with usage_db() as conn:
+        conn.execute(
+            "INSERT INTO usage (date, count) VALUES (?, 1) "
+            "ON CONFLICT(date) DO UPDATE SET count = count + 1",
+            (date.today().isoformat(),),
+        )
+
+
+def safe_invoke(payload):
+    """Run graph.invoke; on any exception show a short error and return False."""
+    try:
+        graph.invoke(payload, run_config())
+        return True
+    except Exception as e:
+        traceback.print_exc()  # full traceback goes to the terminal only
+        st.error("Something went wrong while researching. Please try again.")
+        st.caption(f"Error type: {type(e).__name__}")
+        return False
 
 
 def set_question(text):
@@ -61,10 +102,13 @@ if st.button("Run", type="primary"):
         st.error("Please type a question first.")
     elif len(question) > 500:
         st.error("Please keep the question under 500 characters.")
+    elif runs_today() >= MAX_RUNS_PER_DAY:
+        st.warning("The daily limit is reached. Please try again tomorrow.")
     else:
+        count_run()
         st.session_state.thread_id = str(uuid.uuid4())
         with st.spinner("Researching... this takes about 30 seconds"):
-            graph.invoke({"question": question.strip(), "evidence": []}, run_config())
+            safe_invoke({"question": question.strip(), "evidence": []})
 
 # Nothing to show until a question has been run
 if not st.session_state.thread_id:
@@ -100,8 +144,9 @@ if paused:
 
     if st.button("Approve"):
         with st.spinner("Finishing..."):
-            graph.invoke(Command(resume={"action": "approve"}), run_config())
-        st.rerun()
+            ok = safe_invoke(Command(resume={"action": "approve"}))
+        if ok:
+            st.rerun()
 
     feedback = st.text_area("Request changes", key="feedback", height=80)
     if st.button("Send"):
@@ -109,11 +154,11 @@ if paused:
             st.error("Type the changes you want first.")
         else:
             with st.spinner("Revising... this takes about 20 seconds"):
-                graph.invoke(
-                    Command(resume={"action": "revise", "feedback": feedback.strip()}),
-                    run_config(),
+                ok = safe_invoke(
+                    Command(resume={"action": "revise", "feedback": feedback.strip()})
                 )
-            st.rerun()
+            if ok:
+                st.rerun()
 
 # 7. Final report
 if state.get("final_report"):
