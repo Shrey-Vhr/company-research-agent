@@ -1,6 +1,12 @@
-import streamlit as st
+import uuid
 
-GITHUB_URL = "https://github.com/your-username/Company-Research-Agent"  # placeholder
+import streamlit as st
+from langgraph.types import Command
+
+from research_agent.graph.build import build_graph
+
+GITHUB_URL = "https://github.com/your-username/Company-Research-Agent"  # change to your repo
+DISCLAIMER = "This is for information only and is not investment advice."
 
 EXAMPLES = [
     "Compare TCS and Infosys net margin in FY2025-26",
@@ -8,25 +14,32 @@ EXAMPLES = [
     "What key risks does Infosys name?",
 ]
 
-DUMMY_PLAN = [
-    "Get TCS and Infosys financials from yfinance",
-    "Calculate net margin for each company",
-    "Search the annual reports for the reported margin",
-]
-DUMMY_EVIDENCE = [
-    {"fact": "TCS net income: dummy value", "source": "yfinance", "step": 1},
-    {"fact": "Infosys net income: dummy value", "source": "yfinance", "step": 1},
-    {"fact": "Dummy passage about margin", "source": "TCS annual report, p. 70", "step": 3},
-]
-DUMMY_DRAFT = "This is a dummy draft. The real draft will come from the writer node."
-DUMMY_FINAL = "# Dummy report\n\nThis is a dummy final report with citations."
+
+@st.cache_resource
+def get_graph():
+    """Build the graph (and its SQLite checkpointer) once, not on every rerun."""
+    return build_graph()
+
+
+def run_config():
+    return {"configurable": {"thread_id": st.session_state.thread_id}, "recursion_limit": 30}
 
 
 def set_question(text):
     st.session_state["question"] = text
 
 
+def footer():
+    st.divider()
+    st.caption(DISCLAIMER)
+
+
+# set_page_config must be the first Streamlit command
 st.set_page_config(page_title="Company Research Agent")
+graph = get_graph()
+
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = None
 
 # 1. Header
 st.title("Company Research Agent")
@@ -37,38 +50,80 @@ st.write(
 st.markdown(f"[GitHub repo]({GITHUB_URL})")
 
 # 2. Question input
-st.text_area("Your question", key="question", height=100)
+question = st.text_area("Your question", key="question", height=100)
 cols = st.columns(len(EXAMPLES))
 for col, example in zip(cols, EXAMPLES):
     col.button(example, on_click=set_question, args=(example,), use_container_width=True)
-run_clicked = st.button("Run", type="primary")
 
-# 3. Status area
-status = st.empty()
+# The research runs ONLY on the rerun caused by clicking Run
+if st.button("Run", type="primary"):
+    if not question.strip():
+        st.error("Please type a question first.")
+    elif len(question) > 500:
+        st.error("Please keep the question under 500 characters.")
+    else:
+        st.session_state.thread_id = str(uuid.uuid4())
+        with st.spinner("Researching... this takes about 30 seconds"):
+            graph.invoke({"question": question.strip(), "evidence": []}, run_config())
 
-# 4. Placeholder sections
-st.header("Plan")
-for i, step in enumerate(DUMMY_PLAN, start=1):
-    st.markdown(f"{i}. {step}")
+# Nothing to show until a question has been run
+if not st.session_state.thread_id:
+    st.info("Type a question, or click an example, then click Run.")
+    footer()
+    st.stop()
 
-st.header("Evidence")
-st.table(DUMMY_EVIDENCE)
+# 3. Read the current state from the checkpointer (survives reruns and restarts)
+snapshot = graph.get_state(run_config())
+state = snapshot.values
+paused = bool(snapshot.next)  # True while waiting at human_review
 
-st.header("Draft")
-st.write(DUMMY_DRAFT)
-st.button("Approve")
-st.text_area("Request changes", key="feedback", height=80)
-st.button("Send")
+# 4. Plan
+if state.get("plan"):
+    st.header("Plan")
+    for i, step in enumerate(state["plan"], start=1):
+        st.markdown(f"{i}. {step}")
 
-st.header("Final report")
-st.write(DUMMY_FINAL)
-st.download_button(
-    "Download report (.md)",
-    data=DUMMY_FINAL,
-    file_name="report.md",
-    mime="text/markdown",
-)
+# 5. Evidence (without the long raw content)
+if state.get("evidence"):
+    st.header("Evidence")
+    st.table([
+        {"step": e["step"], "tool": e["tool"], "source": e["citation"]}
+        for e in state["evidence"]
+    ])
 
-# 5. Footer
-st.divider()
-st.caption("This is for information only and is not investment advice.")
+# 6. Draft, shown only while the graph waits for approval
+if paused:
+    st.header("Draft: waiting for your approval")
+    st.markdown(state.get("draft", ""))
+    for problem in state.get("critique", []):
+        st.warning(f"Critic: {problem}")
+
+    if st.button("Approve"):
+        with st.spinner("Finishing..."):
+            graph.invoke(Command(resume={"action": "approve"}), run_config())
+        st.rerun()
+
+    feedback = st.text_area("Request changes", key="feedback", height=80)
+    if st.button("Send"):
+        if not feedback.strip():
+            st.error("Type the changes you want first.")
+        else:
+            with st.spinner("Revising... this takes about 20 seconds"):
+                graph.invoke(
+                    Command(resume={"action": "revise", "feedback": feedback.strip()}),
+                    run_config(),
+                )
+            st.rerun()
+
+# 7. Final report
+if state.get("final_report"):
+    st.header("Final report")
+    st.markdown(state["final_report"])
+    st.download_button(
+        "Download report (.md)",
+        data=state["final_report"],
+        file_name="report.md",
+        mime="text/markdown",
+    )
+
+footer()
