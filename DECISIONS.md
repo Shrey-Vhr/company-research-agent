@@ -307,3 +307,67 @@
 - Why: a file next to the project keeps state across restarts with no server. The SqliteSaver docs show the sqlite3.connect(..., check_same_thread=False) pattern, which I used.
 - Trade-off: SqliteSaver is meant for light, single-process use; checkpoints pile up in the file and nothing deletes old threads. Postgres would be the next step if this ever served several users.
 - Result (if measured): full test on 2026-10-27. I started "Who is the CEO of Wipro?", stopped it at the approval prompt with Ctrl+C, and ran --resume a359a65b-cdda-470c-bceb-310abfd1df8f. It showed the same draft with no new tool calls, then finished after I approved.
+
+## 2026-10-28: One flat TypedDict state; only `evidence` appends
+- Problem / context: The nodes share data only through state, so I had to decide what goes in it and how a node's returned keys are merged.
+- Options considered: (a) a flat TypedDict (ResearchState) with one key per piece of data; (b) nested state with a sub-dict per node; (c) a messages list like the raw loop.
+- Chose: (a). Every key is overwritten when a node returns it; `evidence` is the only key with a reducer (operator.add, see the 2026-10-26 entry).
+- Why: each node reads and writes named keys, so I can test a node alone with a small dict. Overwrite is right for draft, critique and critic_passed, because the newest version replaces the old one.
+- Trade-off: any node can overwrite any key. critique is replaced on each critic run, so earlier critiques are lost, and human_review clears it by hand on "revise".
+- Result (if measured): none.
+
+## 2026-10-28: auto_approve is handled in routing, not inside human_review
+- Problem / context: Evals must run without a person at the approval prompt, but human_review calls interrupt(), which always pauses.
+- Options considered: (a) an auto_approve check inside human_review that skips interrupt(); (b) after_critic routes straight to finalize when auto_approve is set.
+- Chose: (b). In build.py, after_critic returns "finalize" if state["auto_approve"], once the critic has passed or the revision limit is reached.
+- Why: human_review stays "only call interrupt() and return" (see the interrupt() entry), with no branch above the pause. Unattended runs never reach the node at all.
+- Trade-off: the skip is in the routing function, so a reader of human_review alone won't see it. auto_approve is an input in state that normal runs leave unset. A draft that failed the critic at the limit is also finalized unseen, with the note listing the critic's problems.
+- Result (if measured): none yet; evals will use it in Milestone 5.
+
+## 2026-10-28: Streamlit instead of FastAPI with HTML/CSS/JS
+- Problem / context: The agent needs a page where a person can ask, watch progress, approve and download.
+- Options considered: (a) Streamlit; (b) FastAPI backend with an HTML/CSS/JS front end.
+- Chose: (a). FastAPI is listed as future work.
+- Why: faster to build, and the agent is the project, not the UI.
+- Trade-off: Streamlit re-runs the whole script on every click, so state handling is awkward (see the next entry), and the layout is less controllable. No API for other programs to call.
+- Result (if measured): none.
+
+## 2026-10-28: Only thread_id in session_state; the rest is read from the checkpointer
+- Problem / context: Streamlit re-runs the script on every click, and a paused run must survive a refresh or a restart.
+- Options considered: (a) keep plan, evidence and draft in st.session_state; (b) keep only thread_id and call graph.get_state() on every rerun; (c) thread_id also in the URL.
+- Chose: (b) and (c). The thread_id is kept in the URL (?thread=...); the page reads the state from the SQLite checkpointer each rerun.
+- Why: the checkpointer is already the single source of truth, so a second copy in session_state could go out of date. The URL survives a refresh, and session_state does not.
+- Trade-off: one database read per rerun. Anyone with the URL can open the run, and there is no list of past runs.
+- Result (if measured): both recovery cases tested: a refresh and a Streamlit restart each brought back the paused run.
+
+## 2026-10-28: Model output is never rendered as HTML
+- Problem / context: The draft and final report come from a model that reads retrieved text, so it could output HTML or script tags.
+- Options considered: (a) st.markdown(..., unsafe_allow_html=True) for nicer formatting; (b) st.markdown without it.
+- Chose: (b).
+- Why: with HTML off, tags are displayed as text, so injected markup cannot run.
+- Trade-off: no custom HTML styling in answers.
+- Result (if measured): safety test passed: <script> and <img onerror> tags were shown as text and no pop-up appeared.
+
+## 2026-10-28: Daily cap of 20 runs, counted in SQLite
+- Problem / context: Each run costs OpenAI tokens, and the app could be left open or shared.
+- Options considered: (a) no cap; (b) a counter in st.session_state; (c) a small SQLite table, data/usage.sqlite, with (date, count).
+- Chose: (c), MAX_RUNS_PER_DAY = 20. The check runs before the graph starts; Approve and Send don't count.
+- Why: session_state resets on refresh, so it can't enforce a daily limit. SQLite is already used for checkpoints and needs no server.
+- Trade-off: one shared count for everyone, no per-user limit. The run is counted before it starts, so a failed run still uses one.
+- Result (if measured): tested with the cap set to 1.
+
+## 2026-10-28: Friendly errors; full traceback only in the terminal
+- Problem / context: An exception during graph.invoke would show a full traceback in the page, which could include file paths or values from .env.
+- Options considered: (a) let Streamlit show the exception; (b) catch it and show a short message with the exception type; (c) show the message too.
+- Chose: (b). safe_invoke wraps every graph.invoke call, shows "Something went wrong while researching. Please try again." plus the error type, and prints the traceback to the terminal.
+- Why: a user needs to know it failed, not see internals; I still need the traceback to debug.
+- Trade-off: the error type alone doesn't say what went wrong, so I have to look at the terminal.
+- Result (if measured): tested with a deliberate RuntimeError in the planner.
+
+## 2026-10-28: Input checks before any run
+- Problem / context: An empty or very long question would start a paid run that cannot give a useful answer.
+- Options considered: (a) no check; (b) reject empty questions and questions over 500 characters before the run starts.
+- Chose: (b). The checks come before the daily-cap check and before count_run().
+- Why: rejected inputs cost no tokens and don't use up the daily cap, and they give the user a clear message instead of a confusing answer.
+- Trade-off: 500 is a guess, not measured. Valid but strange input (e.g. a question about another company) is still handled by the planner's scope check.
+- Result (if measured): none.

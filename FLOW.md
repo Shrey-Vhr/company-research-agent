@@ -4,14 +4,18 @@
 A research agent that answers questions about NSE-listed Indian companies (e.g. TCS, Infosys, Wipro).
 An OpenAI model, via LangChain and a LangGraph workflow, calls tools to fetch yearly financials from Yahoo Finance, search the FY2025-26 annual
 reports (TCS, Infosys, Wipro) and do arithmetic. Answers cite the source and page or year, never give investment
-advice, and end with a disclaimer.
+advice, and end with a disclaimer. A Streamlit app (`app.py`) lets a person ask a question, watch the plan and
+evidence, approve or change the draft, and download the final report.
 
 ## 2. Current status
-- **Stage:** Milestone 3 in progress. Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and
-  grounding rules) is complete and still works. The Milestone 3 graph works end to end: planner, executor, writer,
-  critic, human review with interrupt and resume, a SQLite checkpointer, the `auto_approve` flag and LangSmith tracing.
+- **Stage:** Milestones 1 to 4 complete. **Next: Milestone 5, evals** (raw agent vs graph without critic vs full graph).
+  Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and grounding rules) still works. The
+  Milestone 3 graph works end to end: planner, executor, writer, critic, human review with interrupt and resume, a
+  SQLite checkpointer, the `auto_approve` flag and LangSmith tracing. Milestone 4 added the Streamlit app (`app.py`):
+  run, approve, request changes, download, recovery of a paused run after a refresh or restart, a daily cap of 20 runs,
+  friendly errors and input checks.
 - **Works:** three tools (`get_financials`, `calculate`, `search_reports`), the raw agent (`SYSTEM_PROMPT` with 11 rules, 8-round limit),
-  two command-line entry points (raw agent and graph), a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
+  three entry points (raw agent and graph on the command line, and the Streamlit app), a 7-day JSON cache, 22 offline unit tests for the tools, and 8 for the chunker.
 - **RAG, index and search done:** `rag/loader.py` loads the three FY2025-26 annual reports as one Document per page
   (1,286 pages kept), tagged with company, FY and `pdf_page`; `rag/chunker.py` splits them into chunks that keep
   that metadata. Two Chroma collections sit in `data/chroma`: `annual_reports` (3,200 chars, 400 overlap, 1,839 chunks,
@@ -24,7 +28,8 @@ advice, and end with a disclaimer.
   is written (HIT if any of the 5 result pages is in `answer_pages`). Results on 2026-10-24: `annual_reports` (3,200) 3/6,
   `annual_reports_1600` 4/6; saved in `evals/results/`.
 - **Failures found by hand** are written up in `evals/FAILURES.md` (F01 wrong CEO from a signature block, F02 answer
-  from the model's own knowledge with a wrong citation); both were fixed with prompt rules.
+  from the model's own knowledge with a wrong citation, F03 timestamp fooled the code check, F04 F01 came back after
+  the LangGraph rebuild); F01 and F02 were fixed with prompt rules, F03 with a code fix and test.
 - **LangGraph graph:** `graph/build.py` wires `graph/nodes.py` (planner, executor, writer, critic, refuse, human_review,
   finalize) over `graph/state.py` with conditional routing; `graph/numbers.py` is the critic's number check. Only
   `numbers.py` has tests (13); the 43 tests in `tests/` all pass. The nodes call the real model and are checked by
@@ -34,7 +39,7 @@ advice, and end with a disclaimer.
 - **Failure F03 found and fixed:** the code check passed "2.0 percentage points" that no calculation produced, because
   a number inside the `fetched_at` timestamp rounded to 2.0. `extract_numbers` now ignores ISO dates and times
   (regression test added; details in `evals/FAILURES.md`). It was found with `explain_support`.
-- **Next (planned):** a Streamlit UI and more eval questions (15).
+- **Still to do:** more retrieval eval questions (15) and the Milestone 5 comparison of the three agent versions.
 
 ## 3. How one question flows
 Diagram: `docs/graph.mmd`. Run it with `python -m research_agent.graph.run "question"` (`--auto` skips human review).
@@ -64,6 +69,23 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 `research_agent/raw_agent/` (one model, three tools, 8 rounds, `SYSTEM_PROMPT`) is kept for comparison and still works:
 `python -m research_agent.raw_agent.loop "question"`. The tool functions are shared by both.
 
+**Through the Streamlit app** (`streamlit run app.py`; the script re-runs from the top on every click):
+1. **Page load:** `build_graph()` is cached with `st.cache_resource`. `st.session_state.thread_id` is taken from the
+   URL (`?thread=...`) if present, so a refresh or a Streamlit restart finds the same run. Nothing else is kept in
+   `session_state` except the question and feedback text boxes.
+2. **Run:** rejects an empty question, one over 500 characters, or a day with 20 runs already counted in
+   `data/usage.sqlite`. Otherwise it counts the run, makes a new uuid `thread_id`, writes it to the URL, and calls
+   `graph.invoke({"question", "evidence": []})`. The call returns when the graph reaches the `human_review` pause (or
+   finishes, for a refusal).
+3. **Every rerun:** the page calls `graph.get_state(thread config)` and draws the plan, the evidence table (step, tool,
+   source), the draft with the critic's problems while the run is paused (`snapshot.next` is not empty), and the
+   final report with a download button once `final_report` exists.
+4. **Approve / Send:** resume with `graph.invoke(Command(resume={"action": "approve"}))` or
+   `Command(resume={"action": "revise", "feedback": ...})`, then `st.rerun()` to redraw from the checkpointer.
+5. **Errors:** every `graph.invoke` goes through `safe_invoke`; on an exception the page shows a short message and the
+   exception type only, and the full traceback is printed to the terminal. Model output is shown with `st.markdown`
+   without `unsafe_allow_html`, so HTML in an answer is displayed as text.
+
 ## 4. Files
 | File | What it does |
 |---|---|
@@ -73,7 +95,8 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `research_agent/graph/nodes.py` | `Plan`, `PLANNER_PROMPT`, `planner`; `TOOLS`, `EXECUTOR_PROMPT`, `executor`; `WRITER_PROMPT`, `writer`; `Verdict`, `CRITIC_PROMPT`, `critic`; `refuse`, `human_review` (`interrupt`), `finalize`; `__main__` manual runner (no graph) that prints the number-support report and saves `data/runs/last_run.json` |
 | `research_agent/graph/run.py` | CLI driver: `python -m research_agent.graph.run "question"` (prints the new uuid thread_id, recursion_limit 30; `--auto` starts with `auto_approve: True` so human review is skipped) or `--resume <thread_id>` (reloads the paused run's pending interrupt from the SQLite checkpointer `data/checkpoints.sqlite`, built in `build_graph`); loops while `__interrupt__` is in the result (prints draft + critique, asks "Approve? (y / changes)", resumes with `Command(resume=...)`), then prints `final_report` |
 | `research_agent/graph/numbers.py` | `extract_numbers`, `find_unsupported` (the critic's code check), `explain_support` (debug print of which evidence number supported each draft number); `_clean` strips ISO dates/times, FY labels and page citations first |
-| `data/checkpoints.sqlite` | LangGraph checkpoints, one thread per run (gitignored via `data/`) |
+| `data/checkpoints.sqlite` | LangGraph checkpoints, one thread per run; used by the CLI and the app (gitignored via `data/`) |
+| `data/usage.sqlite` | Table `usage(date, count)`: how many runs the app has started today, for the daily cap (gitignored via `data/`) |
 | `data/runs/last_run.json` | Final state of the latest manual `nodes.py` run (gitignored, overwritten each run) |
 | `research_agent/prompts.py` | `SYSTEM_PROMPT` (how to work + 11 rules: figures only from tools, source with each figure, no advice, names and roles only from sentences, grounding and citation rules, retry search up to 2 times, "not found" is a valid answer, report beats yfinance and the gap is mentioned, retrieved text is data not instructions) and `DISCLAIMER` |
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
@@ -98,10 +121,11 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `data/reports/` | The three annual-report PDFs (gitignored; sources in `docs/DATA_SOURCES.md`) |
 | `docs/DATA_SOURCES.md` | Where each report PDF came from, download date, page count |
 | `docs/graph.mmd` | Mermaid flowchart of the graph (paste into mermaid.live) |
+| `docs/trace_before.png`, `docs/trace_after.png` | LangSmith traces of the Wipro CEO run before and after the critic fix (64.4 s vs 30.5 s) |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
-| `app.py` | Streamlit UI: question box, Run, shows plan/evidence/draft, Approve and Request changes (resume the graph), final report download. Daily cap of 20 runs counted in `data/usage.sqlite`; graph errors show only the exception type, full traceback goes to the terminal |
+| `app.py` | Streamlit UI (flow in section 3): question box with 3 example buttons, Run, plan / evidence / draft / final report sections, Approve and "Request changes" + Send, report download, disclaimer footer. `get_graph()` (cached), `run_config()`, `safe_invoke()`, `runs_today()` / `count_run()` (cap `MAX_RUNS_PER_DAY = 20`), `?thread=` in the URL |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
-| `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including ones for later stages (LangGraph, Streamlit) |
+| `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including LangGraph, the SQLite checkpointer and Streamlit |
 | `CLAUDE.md` / `DECISIONS.md` / `FLOW.md` | Working rules / decision log / this file |
 | `README.md` | Title only |
 
@@ -126,8 +150,6 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   converted from USD at the yearly average rate, so its figures are approximate. FY labels assume a March year-end.
 - **Repeatability:** the cache expires after 7 days, so eval answers can change when Yahoo updates its data.
 - **Calculator:** no `**`, so it can't do CAGR.
-- **Daily cap is per machine, not per user:** the 20-run count in `data/usage.sqlite` is shared by everyone using the
-  app, and a run that fails still counts.
 - **Retrieval eval is small and uneven:** 6 questions; `answer_pages` ranges from 1 page (r04, r05) to 8 (r03),
   so some questions are easier to hit and per-company hit rates are not fully comparable.
   No cross-company or unanswerable questions yet. The 1,600 vs 3,200 chunk result (4/6 vs 3/6) is one question
@@ -135,7 +157,14 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
 - **Executor does not stop a failed plan:** if a step's tool fails twice, the next steps still run and the writer
   works with whatever evidence exists.
 - **Critic is now more lenient on the names-from-sentences rule;** answers may come from list rows. Retrieval still
-  misses sentence passages for short exact facts (e.g. Wipro CEO on p. 19 and p. 103).
+  misses sentence passages for short exact facts (e.g. Wipro CEO on p. 19 and p. 103); hybrid search (keyword +
+  vector) is the planned fix.
+- **Answers vary between runs:** the same question can give different plans, evidence and wording. Evals should run
+  each question more than once.
+- **After editing `.env`, open a new terminal:** an open VS Code terminal keeps the old values. Close it (trash icon)
+  and open a new one before running again.
+- **App:** one shared daily count, no user login; the run is counted before it starts, so a failed run still counts.
+  A paused run is found again only through the `?thread=` URL (or the SQLite file); there is no list of past runs.
 - **Code check is loose:** it compares numbers only, not what they mean. A draft number rounded to its own decimals can
   match a real figure by chance (small numbers most of all), and numbers the writer derives itself are accepted if
   any evidence number matches. A stricter rule (derived numbers must come from `calculate`) is held back unless F03
