@@ -14,6 +14,11 @@ CHECKPOINT_DB = Path("data/checkpoints.sqlite")
 def after_planner(state: ResearchState) -> str:
     return "executor" if state["in_scope"] and state["plan"] else "refuse"
 
+def after_writer(state: ResearchState) -> str:
+    if state.get("skip_critic"):
+        return "finalize" if state.get("auto_approve") else "human_review"
+    return "critic"
+
 
 def after_executor(state: ResearchState) -> str:
     return "executor" if state["current_step"] < len(state["plan"]) else "writer"
@@ -52,7 +57,7 @@ def build_graph(checkpointer=None):
     g.add_edge(START, "planner")
     g.add_conditional_edges("planner", after_planner, ["executor", "refuse"])
     g.add_conditional_edges("executor", after_executor, ["executor", "writer"])
-    g.add_edge("writer", "critic")
+    g.add_conditional_edges("writer", after_writer, ["critic", "human_review", "finalize"])
     g.add_conditional_edges("critic", after_critic, ["writer", "human_review", "finalize"])
     g.add_conditional_edges("human_review", after_human, ["writer", "finalize"])
     g.add_edge("refuse", END)

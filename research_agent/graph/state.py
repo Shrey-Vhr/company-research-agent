@@ -22,3 +22,4 @@ class ResearchState(TypedDict):
     human_feedback: str                # your change request, empty if none
     final_report: str                  # what the user sees at the end
     auto_approve: bool                 # True = skip human review (used by evals)
+    skip_critic: bool                  # True = writer goes straight on (eval comparison only)

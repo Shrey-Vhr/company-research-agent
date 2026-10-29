@@ -207,17 +207,17 @@ def refuse(state: ResearchState) -> dict:
 
 def finalize(state: ResearchState) -> dict:
     report = state["draft"]
-    if not state["critic_passed"]:
+    if state.get("critic_passed") is False:
         report += ("\n\nNote: an automatic check found problems it could not fix: "
-                   + "; ".join(state["critique"]))
+                   + "; ".join(state.get("critique", [])))
     return {"final_report": report}
 
 
 def human_review(state: ResearchState) -> dict:
     decision = interrupt({
         "draft": state["draft"],
-        "critic_passed": state["critic_passed"],
-        "critique": state["critique"],
+        "critic_passed": state.get("critic_passed"),
+        "critique": state.get("critique", []),
     })
     if decision.get("action") == "approve":
         return {"human_feedback": ""}

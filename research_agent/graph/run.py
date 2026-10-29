@@ -9,7 +9,8 @@ from research_agent.graph.build import build_graph
 def main():
     args = sys.argv[1:]
     auto = "--auto" in args
-    args = [a for a in args if a != "--auto"]
+    no_critic = "--no-critic" in args
+    args = [a for a in args if a not in ("--auto", "--no-critic")]
     graph = build_graph()
 
     if args[:1] == ["--resume"]:
@@ -26,13 +27,15 @@ def main():
     else:
         question = " ".join(args).strip()
         if not question:
-            sys.exit('Usage: python -m research_agent.graph.run "your question" [--auto] | --resume <thread_id>')
+            sys.exit('Usage: python -m research_agent.graph.run "your question" [--auto] [--no-critic] | --resume <thread_id>')
         thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 30}
         print(f"Thread ID: {thread_id}  (resume with --resume {thread_id})")
         start = {"question": question, "evidence": []}
         if auto:
             start["auto_approve"] = True
+        if no_critic:
+            start["skip_critic"] = True
         result = graph.invoke(start, config)
 
     # invoke() returns early with "__interrupt__" when a node calls interrupt()
