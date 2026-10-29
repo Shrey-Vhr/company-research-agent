@@ -8,7 +8,8 @@ advice, and end with a disclaimer. A Streamlit app (`app.py`) lets a person ask 
 evidence, approve or change the draft, and download the final report.
 
 ## 2. Current status
-- **Stage:** Milestones 1 to 4 complete. **Next: Milestone 5, evals** (raw agent vs graph without critic vs full graph).
+- **Stage:** Milestones 1 to 4 complete. **Milestone 5, evals** (raw agent vs graph without critic vs full graph):
+  step 1 done (answer key for all 20 questions in `evals/questions.json`); next: scoring and the three runs.
   Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and grounding rules) still works. The
   Milestone 3 graph works end to end: planner, executor, writer, critic, human review with interrupt and resume, a
   SQLite checkpointer, the `auto_approve` flag and LangSmith tracing. Milestone 4 added the Streamlit app (`app.py`):
@@ -109,6 +110,7 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5, collection_name="annual_reports_1600")`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
 | `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
 | `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval [--collection NAME]` (default `annual_reports_1600`): `search(question, company, k=5, collection_name)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<collection>_<date>.json` (collection name also inside the file) |
+| `evals/questions.json` | The 20 end-to-end eval questions with a hand-built answer key (Milestone 5 step 1, found without the agent): `accepted_values` (INR crore, % or ratio), `tolerance`, `expected_points`, `expected_pages` (`company` + `pdf_page`), `notes` (sources, formulas, wrong-but-tempting figures). Scoring is not written yet |
 | `evals/FAILURES.md` | Hand-found agent failures (F01 wrong CEO, F02 answer from model knowledge, F03 code check fooled by a timestamp): cause, fix, result or remaining risk |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
@@ -172,7 +174,9 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
 - **No tests for the graph nodes or routing** (`planner`, `executor`, `writer`, `critic`, `after_*`): the nodes call the
   real model, so they are tried only by running the graph. `explain_support` has no test.
 - **No tests for `run_agent`** (they would need a fake model). Only the tools are tested.
-- **Not cross-checked:** only TCS revenue has been checked against an annual report; Infosys/Wipro and the other fields haven't.
+- **Cross-checked (by hand, for the eval key):** revenue and net income for all three, and debt/equity, agree with the
+  reports apart from the definitions above (Infosys figures are about 0.3-0.6% off because of the USD conversion).
+  Operating income has not been checked.
 - **Report page numbers:** citations use `pdf_page` (PDF page, 1-based), not the number printed on the page.
   They differ by about 30 (TCS PDF p. 181 = printed p. 211), and some PDF pages are two-page spreads.
 - **Garbled TCS tables:** in TCS the ₹ sign comes out as "H" (`(H crore)`), some words are split up
@@ -187,10 +191,16 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
 - **Deprecated loader dependency:** the loader uses `PyMuPDFLoader` from `langchain-community`, which pytest
   warns is being sunset and no longer maintained. It works now. Versions are pinned in `requirements.txt`;
   plan: replace it with `pymupdf` directly in Milestone 6.
-- **Profit definition (open):** for TCS FY2025-26, yfinance net income is ₹49,210 crore (margin 18.4%) but the annual
-  report says profit after tax ₹52,820 crore (p. 69; PAT / total revenue 19.8%, p. 70). The cause is not identified;
-  the report's definition still has to be checked. The agent reports both figures and the gap, and treats the
-  report as the official source (prompt rule 10). Other fields and companies have not been compared.
+- **Profit definition (cause found, agent not changed):** for TCS FY2025-26, yfinance net income ₹49,210 crore is the
+  reported profit attributable to shareholders (p. 167, p. 35). The ₹52,820 crore on p. 69 is profit *excluding
+  exceptional items* (footnote on p. 69; margin 19.8%). Wipro's yfinance net income is also the equity-holders figure
+  (₹13,197.4 crore, excluding non-controlling interests). The agent still treats the report as the official source
+  (prompt rule 10) and does not know this difference. Debt also differs: yfinance `total_debt` is borrowings + leases
+  (TCS and Infosys: leases only), while Wipro's report ratio (0.19) uses borrowings only (yfinance-style 0.23).
+- **Currency bug in `get_financials` (found 2026-10-29, not fixed):** for `HCLTECH`, Yahoo labels `financialCurrency`
+  as USD but the values are rupees, so revenue comes out about 100x too large (11,496,351.66 "crore"). Infosys is
+  genuinely in USD and converts correctly, but its balance-sheet items use the *average* rate, not the year-end rate
+  (equity 86,445 vs 92,852 in the report).
 - **Token cost (one measurement):** every `search_reports` call returns up to 5 chunks of up to 1,600 chars (about
   2,000 tokens by chars / 4). The loop sends the whole message list on every round, so a tool result is paid for
   again in each later round, and the rules allow up to 2 extra searches per fact. The long `search_reports`

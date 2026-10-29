@@ -1,0 +1,555 @@
+[
+  {
+    "id": "q01",
+    "category": "single_number",
+    "question": "What was Wipro's revenue in FY2025-26?",
+    "accepted_values": [
+      92624
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "WIPRO",
+        "pdf_page": 284
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 396
+      }
+    ],
+    "notes": "Unit: INR crore. yfinance 92,624.0 (WIPRO.NS, fetched live 2026-10-29). Report: consolidated Revenue from operations 926,240 INR million = 92,624 crore (Ind AS p284; IFRS p396). The two agree exactly."
+  },
+  {
+    "id": "q02",
+    "category": "single_number",
+    "question": "What was TCS's revenue in FY2025-26?",
+    "accepted_values": [
+      267021
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 167
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 69
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 35
+      }
+    ],
+    "notes": "Unit: INR crore. yfinance 267,021.0 (cache 2026-10-25). Report: consolidated Revenue from operations 2,67,021 (p167; also p69, p35). Exact match. Standalone revenue is 2,20,938 (p35): a wrong answer if it is given as TCS revenue."
+  },
+  {
+    "id": "q03",
+    "category": "single_number",
+    "question": "What was Infosys's revenue in FY2025-26?",
+    "accepted_values": [
+      178650,
+      178066.95
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 287
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 33
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 16
+      }
+    ],
+    "notes": "Unit: INR crore. Report (official): consolidated 1,78,650 (p287, p33, p16). yfinance 178,066.95 is approximate: Infosys is reported in USD there and converted at the year's average rate 88.34 (0.33% below the report). Standalone is 1,48,819 (p33): wrong if given as Infosys revenue. Prefer the report value; the yfinance value is accepted because the tool says it is approximate."
+  },
+  {
+    "id": "q04",
+    "category": "single_number",
+    "question": "What was Wipro's net profit (PAT) in FY2025-26?",
+    "accepted_values": [
+      13197.4,
+      13265.5
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "WIPRO",
+        "pdf_page": 285
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 284
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 396
+      }
+    ],
+    "notes": "Unit: INR crore. yfinance net_income 13,197.4. Report: profit attributable to equity holders 131,974 INR million = 13,197.4 crore (p285; IFRS p396). Total 'Profit for the year' incl. non-controlling interests is 132,655 million = 13,265.5 crore (p284). The yfinance value equals the equity-holders figure. Decision 2026-10-29: 13,265.5 (profit for the year incl. non-controlling interests, p284) is also accepted."
+  },
+  {
+    "id": "q05",
+    "category": "single_number",
+    "question": "What was TCS's net profit (PAT) in FY2025-26?",
+    "accepted_values": [
+      49454
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 167
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 35
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 69
+      }
+    ],
+    "notes": "Unit: INR crore. yfinance 49,210. Report: profit attributable to shareholders, reported = 49,210 (p167, p35, p224). The figure 52,820 (p69 '10 years' table, p36 text) is profit EXCLUDING exceptional items (legal claim provision, restructuring, new Labour Codes impact); the footnote on p69 says so. This resolves the open 'profit definition' problem in FLOW.md. Profit for the year incl. non-controlling interests is 49,454 (p167). Decision 2026-10-29: 52,820 is NOT accepted."
+  },
+  {
+    "id": "q06",
+    "category": "single_number",
+    "question": "What was Infosys's net profit (PAT) in FY2025-26?",
+    "accepted_values": [
+      29440,
+      29265.59
+    ],
+    "tolerance": {
+      "type": "relative",
+      "value": 0.005
+    },
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 288
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 33
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 16
+      }
+    ],
+    "notes": "Unit: INR crore. Report: profit attributable to owners 29,440 (p288, p33, p16). Profit incl. non-controlling interests 29,474 (p288). yfinance 29,265.59 is USD-converted at the average rate and is 0.59% below the report, so it is outside a 0.5% tolerance of 29,440; it is listed as its own accepted value. Standalone profit is 29,211 (p33): wrong for the group."
+  },
+  {
+    "id": "q07",
+    "category": "ratio",
+    "question": "What was TCS's net margin in FY2025-26?",
+    "accepted_values": [
+      18.43
+    ],
+    "tolerance": {
+      "type": "absolute",
+      "value": 0.1,
+      "unit": "percentage points"
+    },
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 167
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 35
+      }
+    ],
+    "notes": "Formula: net profit / revenue x 100 = 49,210 / 267,021 = 18.43% (same inputs from yfinance and the report). Variants: 49,454 (incl. NCI) / 267,021 = 18.52%; 52,820 (excl. exceptional items) / 267,021 = 19.78% (FLOW.md says 19.8%, the 'p.70' value). 19.78 is NOT accepted (same decision as q05). The report's own 'Net profit ratio' on p316 (22.2%) is STANDALONE, not consolidated; do not accept it for the group."
+  },
+  {
+    "id": "q08",
+    "category": "ratio",
+    "question": "What was Infosys's net margin in FY2025-26?",
+    "accepted_values": [
+      16.48,
+      16.5,
+      16.44
+    ],
+    "tolerance": {
+      "type": "absolute",
+      "value": 0.1,
+      "unit": "percentage points"
+    },
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 81
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 33
+      }
+    ],
+    "notes": "Formula: 29,440 / 178,650 x 100 = 16.48% (report values). Report prints 16.5% as consolidated 'Net profit margin' (p81) and 'Profit after tax (% of revenue)' (p33; computed on profit incl. NCI 29,474 -> 16.50%). yfinance: 29,265.59 / 178,066.95 = 16.44%. The 19.6% on p81/p33 is STANDALONE: wrong for the group."
+  },
+  {
+    "id": "q09",
+    "category": "comparison",
+    "question": "Compare TCS and Wipro debt-to-equity in FY2025-26.",
+    "accepted_values": [
+      0.11,
+      0.1,
+      0.23,
+      0.19
+    ],
+    "tolerance": {
+      "type": "absolute",
+      "value": 0.02
+    },
+    "expected_points": [
+      "TCS has a much lower debt-to-equity than Wipro (about 0.1 vs about 0.2)",
+      "TCS 'debt' is only lease liabilities (no borrowings)",
+      "Wipro's value depends on the definition: 0.23 with borrowings + leases (yfinance), 0.19 with borrowings only (report)"
+    ],
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 166
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 315
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 395
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 45
+      }
+    ],
+    "notes": "TCS: yfinance total_debt 11,283 / total_equity 107,240 = 0.105. Report: lease liabilities 9,453 + 1,830 = 11,283 (p166) so yfinance 'debt' = leases; no borrowings; equity attributable 1,07,240; the report's own ratio is printed as 0.1 (p315; debt = borrowings + lease liabilities). Wipro: yfinance 20,291.0 / 88,536.8 = 0.229. Report IFRS (p395, INR million): borrowings 1,962 + 165,912 + leases 26,327 + 8,709 = 202,910 = 20,291 crore (matches yfinance); equity attributable 885,368 = 88,536.8 crore -> 0.229. Wipro's own printed Debt-equity (p45) = 0.19, which reproduces as borrowings only 167,874 / 885,368 = 0.190. Note: Wipro p270 'Debt-equity 0.13' is STANDALONE. Accepted values mix both companies: TCS {0.11, 0.1}, Wipro {0.23, 0.19}."
+  },
+  {
+    "id": "q10",
+    "category": "comparison",
+    "question": "Compare Infosys and Wipro debt-to-equity in FY2025-26.",
+    "accepted_values": [
+      0.1,
+      0.099,
+      0.23,
+      0.19
+    ],
+    "tolerance": {
+      "type": "absolute",
+      "value": 0.02
+    },
+    "expected_points": [
+      "Infosys has a much lower debt-to-equity than Wipro (about 0.1 vs about 0.2)",
+      "Infosys 'debt' is only lease liabilities (no outstanding borrowings)",
+      "Wipro's value depends on the definition: 0.23 with borrowings + leases, 0.19 with borrowings only"
+    ],
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 286
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 81
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 395
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 45
+      }
+    ],
+    "notes": "Infosys: report consolidated (p286, INR crore): lease liabilities 6,016 + 3,160 = 9,176; equity attributable 92,852 -> 0.099 (0.098 on total equity 93,297). Report prints 0.1 consolidated (p81; footnote 3: 'Debt represents only lease liabilities'; the 0.0 is standalone). yfinance: 8,542.05 / 86,445.24 = 0.099 (its debt and equity are converted from USD at the AVERAGE rate, so both differ from the balance-sheet values: 8,542 vs 9,176 and 86,445 vs 92,852; the ratio still agrees). Wipro: see q09 (0.229 / 0.19)."
+  },
+  {
+    "id": "q11",
+    "category": "ratio",
+    "question": "How much did TCS's revenue grow from FY2024-25 to FY2025-26?",
+    "accepted_values": [
+      4.58,
+      4.6
+    ],
+    "tolerance": {
+      "type": "absolute",
+      "value": 0.1,
+      "unit": "percentage points"
+    },
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 167
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 69
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 36
+      }
+    ],
+    "notes": "Formula: (267,021 - 255,324) / 255,324 x 100 = 11,697 / 255,324 = 4.58%. Both yfinance and the report give 267,021 and 255,324 (INR crore). Report text says 'higher by 4.6%' (p36, garbled glyphs in PyMuPDF text). The absolute increase is INR 11,697 crore (not scored; in notes only). Standalone growth is 2.8% (p36): wrong for the group."
+  },
+  {
+    "id": "q12",
+    "category": "report",
+    "question": "What key risks does Infosys name?",
+    "expected_points": [
+      "Geopolitical, macroeconomic or health events (revenue concentrated in few geographies, industries and clients)",
+      "Artificial intelligence risks (failure to transform services / scale AI-first offerings)",
+      "Global Capability Centres (clients insourcing)",
+      "Technology disruption and innovation",
+      "Talent supply constraints",
+      "Cybersecurity",
+      "Data protection and privacy",
+      "Cost inflation / inability to improve margin",
+      "ESG ambition",
+      "Contractual liabilities",
+      "Regulatory / compliance (continues on p135)"
+    ],
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 132
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 133
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 134
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 135
+      }
+    ],
+    "notes": "Pass rule: the answer names at least 2 risks from this list and cites a page inside this risk section (expected_pages). Source: 'Risk management report', table 'Key / Emerging risks' (pdf pages 132-135, printed 163-166). The report says the list may not be exhaustive. the list was read from pages 132-135 (page 135 beyond contractual liabilities was only skimmed). Page 81 (MD&A 'Outlook, risks and concerns') points to this section."
+  },
+  {
+    "id": "q13",
+    "category": "report",
+    "question": "What key risks does Wipro name?",
+    "expected_points": [
+      "Information and cybersecurity",
+      "Legal, regulatory and compliance",
+      "Data privacy",
+      "Geopolitical and macroeconomic volatility",
+      "Finance and market risk (taxation, wage pressure, credit, foreign currency, interest rate, liquidity)",
+      "People operations (talent and culture)",
+      "Employee health and safety",
+      "Service delivery and contractual obligation management (incl. large deals)",
+      "M&A integration",
+      "Third-party / supplier risk",
+      "Strategy and market risk (incl. tariffs and trade policy)",
+      "Technology and innovation (incl. rapid AI advances)",
+      "Also listed as key risk domains (p87): Generative AI, business resilience, fraud / anti-bribery, ESG, emerging risk"
+    ],
+    "expected_pages": [
+      {
+        "company": "WIPRO",
+        "pdf_page": 87
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 88
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 89
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 90
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 91
+      }
+    ],
+    "notes": "Pass rule: the answer names at least 2 risks from this list and cites a page inside this risk section (expected_pages). Source: 'Our Approach to Managing Risk' (pdf pages 87-91, printed 113-117); p87 has the list of key risk domains. Climate/ESG risks have their own pages (about 93-94, not read in detail)."
+  },
+  {
+    "id": "q14",
+    "category": "report",
+    "question": "What key risks does TCS name?",
+    "expected_points": [
+      "Volatile global, political and economic environment",
+      "Disruptive technologies (AI), both risk and opportunity",
+      "Ability to attract and retain top talent / short supply of emerging technical skills",
+      "Business model changes",
+      "Cyber attacks",
+      "Restrictions on global mobility / location strategies",
+      "Non-compliance with complex and changing global regulations",
+      "Intellectual property infringement and leakage",
+      "Sustainability risks (climate change and environmental)",
+      "Data protection and privacy compliance",
+      "Litigation risks",
+      "Currency volatility"
+    ],
+    "expected_pages": [
+      {
+        "company": "TCS",
+        "pdf_page": 62
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 63
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 64
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 65
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 66
+      },
+      {
+        "company": "TCS",
+        "pdf_page": 67
+      }
+    ],
+    "notes": "Pass rule: the answer names at least 2 risks from this list and cites a page inside this risk section (expected_pages). Source: Management Discussion and Analysis, 'Enterprise Risk Management' (intro p61, list pages 62-67, printed 92-97); headings are marked (R) risk / (O) opportunity. TCS text is partly garbled in the PDF extraction, but these headings are readable."
+  },
+  {
+    "id": "q15",
+    "category": "old_failures",
+    "question": "Who is the CEO of Wipro?",
+    "expected_points": [
+      "Srinivas Pallia, Chief Executive Officer and Managing Director (not the Chairman, Rishad Premji)"
+    ],
+    "expected_pages": [
+      {
+        "company": "WIPRO",
+        "pdf_page": 103
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 19
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 21
+      }
+    ],
+    "notes": "Plain sentence on p103 ('Mr. Srinivas Pallia, Chief Executive Officer and Managing Director'); p19 board list; p21 letter signature; p283 balance-sheet signature block. These are the F01/F04 failure pages (signature blocks mislead). Trap: Rishad A. Premji is the Chairman, not the CEO."
+  },
+  {
+    "id": "q16",
+    "category": "old_failures",
+    "question": "Who is the chairman of Wipro, according to its annual report?",
+    "expected_points": [
+      "Rishad A. Premji (Chairman; the board list on p19 says 'Executive Chairman')"
+    ],
+    "expected_pages": [
+      {
+        "company": "WIPRO",
+        "pdf_page": 133
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 19
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 113
+      },
+      {
+        "company": "WIPRO",
+        "pdf_page": 283
+      }
+    ],
+    "notes": "p133: sentence 'sessions led by our Chairman, Mr. Rishad A. Premji'; p19: board list 'Rishad A. Premji | Executive Chairman'; p113: remuneration table 'Chairman'; p283: signature block 'Chairman'. Azim H. Premji appears elsewhere in the report as a director and founder; his role was not checked, and he should not be accepted as the chairman."
+  },
+  {
+    "id": "q17",
+    "category": "old_failures",
+    "question": "Who is the CEO of Infosys?",
+    "expected_points": [
+      "Salil Parekh, Chief Executive Officer and Managing Director (not Nandan Nilekani, who is Chairman)"
+    ],
+    "expected_pages": [
+      {
+        "company": "INFY",
+        "pdf_page": 12
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 18
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 44
+      },
+      {
+        "company": "INFY",
+        "pdf_page": 56
+      }
+    ],
+    "notes": "p12 board profile 'Salil Parekh | Chief Executive Officer and Managing Director'; p18 shareholder letter signed by him; p44, p54-55 signature blocks (Nandan M. Nilekani, Chairman; Salil Parekh, CEO and MD); p56, p58 tables. Trap: Nilekani is Chairman."
+  },
+  {
+    "id": "q18",
+    "category": "out_of_scope",
+    "question": "Should I buy TCS?",
+    "expected_points": [
+      "Refuses to give a buy / sell recommendation or investment advice",
+      "May offer to share factual, sourced information instead",
+      "Includes the disclaimer"
+    ],
+    "notes": "Expected behaviour: refuse (planner marks in_scope = false, fixed refusal text). A pass is a refusal with no recommendation and no price targets. No numeric answer."
+  },
+  {
+    "id": "q19",
+    "category": "unanswerable",
+    "question": "What was HCLTech's revenue in FY2025-26?",
+    "expected_points": [
+      "States that HCLTech is outside what the agent covers (only TCS, Infosys and Wipro are covered) / says it cannot answer",
+      "Does NOT report a revenue number"
+    ],
+    "notes": "Expected behaviour: refuse or say unknown. The three annual reports have no HCLTech figures (HCL appears only as a name in Infosys p58 and p367 and Wipro p118). WARNING, tool bug: get_financials('HCLTECH') returns revenue 11,496,351.66 'INR crore' (about 100x too large). Yahoo labels HCLTech's financialCurrency as USD but the raw value is 1.30144e12 rupees (about INR 130,144 crore), so the tool multiplies by the USD/INR rate 88.34 by mistake. So if the agent answers with any number, it is wrong. I could not check the true figure against an HCLTech report (not in the data); the raw Yahoo figure is unverified, so there is no accepted value."
+  },
+  {
+    "id": "q20",
+    "category": "unanswerable",
+    "question": "What will TCS's revenue be in FY2030?",
+    "expected_points": [
+      "Says it cannot predict or forecast future revenue",
+      "Does NOT give a number",
+      "May give past revenue (FY2025-26: 267,021 crore) as context"
+    ],
+    "notes": "Expected behaviour: refuse or say unknown (planner treats predictions as out of scope). The TCS report has no FY2030 revenue figure; searching 'FY 2030' only finds emission targets (p31, p111, p136, p347) and a director's term (p40). Neither Infosys nor Wipro has one either."
+  }
+]

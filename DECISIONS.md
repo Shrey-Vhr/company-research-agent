@@ -228,7 +228,13 @@
   profit after tax ₹52,820 crore (p. 69) and PAT / total revenue 19.8% (p. 70).
 - Checked: both report numbers appear in the cited passages (text check);
   ₹52,820 crore is in the [FY2026 / FY2025] column (checked by eye on p. 69).
-- Likely cause: Not yet identified; the report’s definition needs checking.
+- Likely cause: 52,820 is profit excluding exceptional items (footnote on
+  p. 69: legal claim provision, restructuring, new Labour Codes impact).
+  The reported profit attributable to shareholders is 49,210 (p. 167, p. 35),
+  which matches yfinance. Found 2026-10-29 while building the eval answer key.
+- Result: the two numbers are two definitions, not an error. 19.8% margin is
+  on the adjusted profit; the reported margin is 18.43%. The agent's handling
+  (report both, report is official) is unchanged and does not yet know why.
 - Handling: the agent reports both figures, gives the gap, and treats the
   annual report as the official source (prompt rule 10).
 - Trade-off: answers show two numbers instead of one, which is less tidy but
@@ -371,3 +377,29 @@
 - Why: rejected inputs cost no tokens and don't use up the daily cap, and they give the user a clear message instead of a confusing answer.
 - Trade-off: 500 is a guess, not measured. Valid but strange input (e.g. a question about another company) is still handled by the planner's scope check.
 - Result (if measured): none.
+
+## 2026-10-29: Eval answer key built by hand from two sources
+- Problem / context: Milestone 5 needs a correct answer for each of the 20
+  questions, found without the agent, so the three agent versions can be scored.
+- Options considered:
+  1. Use yfinance values only.
+  2. Use annual-report values only.
+  3. Collect both, and accept either where they differ.
+- Chose: Option 3. `accepted_values` holds the yfinance value and the report
+  value where they differ (q03, q04, q06, q08; q09/q10 hold both Wipro
+  definitions). Tolerance: 0.5% relative for rupee amounts, 0.1 percentage
+  points for margins and growth, 0.02 absolute for debt-to-equity.
+- PAT decisions: TCS 52,820 (excluding exceptional items) is not accepted;
+  reported 49,210 is. Wipro accepts both 13,197.4 (equity holders) and
+  13,265.5 (profit for the year incl. non-controlling interests).
+- Risk questions: pass if the answer names at least 2 risks from the report's
+  list and cites a page inside that risk section.
+- Why: yfinance and the annual reports sometimes measure the same thing
+  differently (USD conversion, which profit line), so accepting only one
+  source would mark correct answers wrong. The 2-risk rule keeps the risk
+  questions scoreable, because the risk lists are long and a short answer
+  can't name them all.
+- Trade-off: accepting two values makes scoring more lenient; the Infosys
+  yfinance values are 0.3-0.6% off because of USD conversion; the risk rule
+  does not check that the named risks are the most important ones.
+- Result (if measured): not scored yet.
