@@ -39,3 +39,25 @@
 - Lesson: when rebuilding, re-test every old failure. Milestone 5 evals must
   include an F01-style question so this is caught automatically.
 - result: “Re-test: correct name (Srinivas Pallia); writer flagged that evidence was table/signature only; critic flagged it too. Sentence passages (p. 19, 103) not retrieved: known retrieval limit.”
+
+## F05: Debt-to-equity written as percentages; scorer marked it wrong (2026-11-01)
+- Runs: q09 and q10, graph_no_critic (eval run 2026-10-30_192104)
+- Answer: Wipro 22.9%, TCS 10.5% (evidence: 0.229, 0.105), plus a gap of 12.4
+  points the writer computed itself
+- Scored: fail, because the scorer compares 22.9 with 0.229
+- Real status: values correct, different format; the gap figure broke the
+  "every number from a tool" rule
+- In graph_full, the critic's code check flagged 22.9, 10.5 and 12.4 (8 items,
+  duplicates), and the rewrite used the evidence's format and passed
+- Lessons: (1) the critic's measured gain here was format consistency plus
+  one ungrounded figure, not factual correctness; (2) the scorer should
+  accept percentage forms of ratios; (3) the writer prompt should keep
+  numbers in the evidence's form; (4) remove duplicate critique items
+
+## F06: Raw agent answered an out-of-scope company with wrong data (2026-10-30)
+- Run: q19, raw. Answer: HCLTech revenue ~₹1,14,96,351 crore (about 100x too high)
+- Cause: get_financials accepts any ticker; Yahoo's currency label for
+  HCLTech is wrong; the raw agent has no scope check
+- Graph versions refused in under 2 s (planner scope check)
+- Lesson: the clearest real advantage of the graph in this eval is safety on
+  out-of-scope questions. Fix the tool to reject tickers outside TCS, INFY, WIPRO.

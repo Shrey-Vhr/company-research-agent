@@ -403,3 +403,16 @@
   yfinance values are 0.3-0.6% off because of USD conversion; the risk rule
   does not check that the named risks are the most important ones.
 - Result (if measured): not scored yet.
+
+## 2026-11-01: Report strict and percentage-tolerant number scores, and disclose how text answers were graded
+
+- Problem / context: In the milestone 5 run (2026-10-30_192104), graph_no_critic failed q09 and q10 under `score_numbers`. Its answers gave the debt-to-equity ratios as percentages ("22.9%", "10.5%", "9.9%"), while the answer key accepts ratios (0.23, 0.1, 0.099). The numbers match; only the format differs. Separately, q12-q20 can't be scored by code, so they were hand-graded.
+- Options considered:
+  1. Keep only the strict score and count the format mismatch as a failure.
+  2. Change `score_numbers` so percentages are accepted.
+  3. Leave `score_numbers` unchanged and add a second score in `summarize.py` that also accepts "X%" as X/100, then report both.
+  For the text questions: grade them all by hand from scratch, or have Claude Code draft the grades and review every row.
+- Chose: Option 3. The tolerant rule applies only to plain-ratio questions (q09, q10). The percentage-point questions (q07, q08, q11) stay strict. Both scores appear in the summary table. For q12-q20, Claude Code drafted the 27 grades from the pass rules in the answer key, and I reviewed all 27 rows (27 of 27 agreed) before copying them into the `pass` column.
+- Why: A ratio of 0.229 and 22.9% are the same value, so failing it would measure formatting, not correctness. But changing the original scorer after seeing the results would look like moving the goalposts. Keeping the strict score and adding a separate tolerant one shows both, so a reader can see exactly how much of the gap is format and how much is wrong numbers. Points from the discussion: the strict score is the original, unchanged definition of correct. The tolerant score shows how much of the gap is formatting and how much is wrong numbers. Reporting both keeps the comparison honest, because the two scores give different rankings for graph_no_critic.
+- Trade-off: Two numbers per version are harder to read than one. The tolerant rule could pass a wrong answer that happens to match after dividing by 100, which is why it is limited to q09 and q10. The text grades were drafted by Claude Code, which also helped build parts of this project. Agreement on all 27 rows shows I accepted the drafts, not that they're independent of Claude's judgement. The q15-q17 graph_full hedges ("does not clearly state...") and the q19 and q20 refusals are the judgement calls.
+- Result (if measured): Numbers, graph_no_critic: 9/11 strict, 11/11 tolerant. Overall, graph_no_critic: 18/20 strict, 20/20 tolerant. raw: 19/20 on both scores (its only fail is q19, which gave an HCLTech revenue number). graph_full: 20/20 on both. The tolerant score is the only thing that changes the ranking between graph_no_critic and graph_full.

@@ -9,7 +9,7 @@ evidence, approve or change the draft, and download the final report.
 
 ## 2. Current status
 - **Stage:** Milestones 1 to 4 complete. **Milestone 5, evals** (raw agent vs graph without critic vs full graph):
-  step 1 done (answer key for all 20 questions in `evals/questions.json`); next: scoring and the three runs.
+  answer key done (`evals/questions.json`) and runner done (`evals/run_evals.py`), full run 2026-10-30_192104 done and hand-graded, summary script done (`evals/summarize.py`); next: fill in token prices, read the results and write them up.
   Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and grounding rules) still works. The
   Milestone 3 graph works end to end: planner, executor, writer, critic, human review with interrupt and resume, a
   SQLite checkpointer, the `auto_approve` flag and LangSmith tracing. Milestone 4 added the Streamlit app (`app.py`):
@@ -90,7 +90,7 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 ## 4. Files
 | File | What it does |
 |---|---|
-| `research_agent/raw_agent/loop.py` | `run_agent`: the tool-calling loop; `__main__`: command-line entry point |
+| `research_agent/raw_agent/loop.py` | `run_agent(question, return_details=False)`: the tool-calling loop (with `return_details=True` it returns `(text, {tool_results, input_tokens, output_tokens})`, used by the evals); `__main__`: command-line entry point |
 | `research_agent/graph/state.py` | `ResearchState` (TypedDict): question, in_scope, plan, current_step, evidence (append reducer), draft, critique, critic_passed, revision_count, human_feedback, final_report, auto_approve; the shape of an evidence item is in a comment at the top |
 | `research_agent/graph/build.py` | `build_graph(checkpointer=None)`: adds the 7 nodes and edges, routing functions `after_planner`, `after_executor`, `after_critic`, `after_human`, `MAX_REVISIONS = 2`; `default_checkpointer()` opens the SQLite checkpointer |
 | `research_agent/graph/nodes.py` | `Plan`, `PLANNER_PROMPT`, `planner`; `TOOLS`, `EXECUTOR_PROMPT`, `executor`; `WRITER_PROMPT`, `writer`; `Verdict`, `CRITIC_PROMPT`, `critic`; `refuse`, `human_review` (`interrupt`), `finalize`; `__main__` manual runner (no graph) that prints the number-support report and saves `data/runs/last_run.json` |
@@ -111,6 +111,8 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
 | `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval [--collection NAME]` (default `annual_reports_1600`): `search(question, company, k=5, collection_name)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<collection>_<date>.json` (collection name also inside the file) |
 | `evals/questions.json` | The 20 end-to-end eval questions with a hand-built answer key (Milestone 5 step 1, found without the agent): `accepted_values` (INR crore, % or ratio), `tolerance`, `expected_points`, `expected_pages` (`company` + `pdf_page`), `notes` (sources, formulas, wrong-but-tempting figures). Scoring is not written yet |
+| `evals/run_evals.py` | Eval runner shell: `python -m evals.run_evals [--versions raw graph_no_critic graph_full] [--ids q02 q18] [--repeats N]`. Runs each question on each version (graph runs: new `thread_id`, `recursion_limit` 30, `auto_approve: True`, `skip_critic` True/False; tokens from `UsageMetadataCallbackHandler`; raw tokens from the loop's own totals), records answer, evidence, seconds, tokens and any error, saves `evals/results/run_<date>_<time>.json` (after every run) and `grading_<date>_<time>.csv` (q12-q20, empty `pass` column). `score_numbers` is a stub (`NotImplementedError`) for you to write |
+| `evals/summarize.py` | `python -m evals.summarize`: scores q01-q11 with `score_numbers`, reads your hand grades (`pass` column, q12-q20) from the grading CSV, and writes `summary_<stamp>.md` (per-version score, time, tokens, cost, errors; list of failed questions). Token prices are constants at the top. |
 | `evals/FAILURES.md` | Hand-found agent failures (F01 wrong CEO, F02 answer from model knowledge, F03 code check fooled by a timestamp): cause, fix, result or remaining risk |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |

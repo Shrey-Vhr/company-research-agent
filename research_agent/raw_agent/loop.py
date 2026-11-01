@@ -11,13 +11,14 @@ from research_agent.prompts import SYSTEM_PROMPT
 from research_agent.tools.reports import search_reports
 
 load_dotenv()
-def run_agent(question: str) -> str:
+def run_agent(question: str, return_details: bool = False):
     tools = {"get_financials": get_financials, "calculate": calculate,  "search_reports": search_reports}
     model = ChatOpenAI(model=os.environ["LLM_MODEL"]).bind_tools(
         list(tools.values()), parallel_tool_calls=True
     )
     messages = [SystemMessage(SYSTEM_PROMPT), HumanMessage(question)]
     total_in, total_out = 0, 0
+    tool_results = []                         # only returned when return_details=True
     for round_no in range(1, 9):              # max 8 rounds
         reply = model.invoke(messages)
         usage = reply.usage_metadata or {}
@@ -27,6 +28,8 @@ def run_agent(question: str) -> str:
 
         if not reply.tool_calls:
             print(f"Tokens: {total_in} in, {total_out} out")
+            if return_details:
+                return reply.text, {"tool_results": tool_results, "input_tokens": total_in, "output_tokens": total_out}
             return reply.text
 
         for call in reply.tool_calls:
@@ -42,9 +45,13 @@ def run_agent(question: str) -> str:
                 except Exception as e:
                     result = f"Error: {e}"
             print(f"Round {round_no}: returned {len(str(result))} chars in {seconds:.2f}s: {str(result)[:200]}")
+            tool_results.append({"tool": call["name"], "args": call["args"], "content": str(result)})
             messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))
 
-    return "Stopped after 8 rounds without a final answer."
+    text = "Stopped after 8 rounds without a final answer."
+    if return_details:
+        return text, {"tool_results": tool_results, "input_tokens": total_in, "output_tokens": total_out}
+    return text
 
 if __name__ == "__main__":
     question = " ".join(sys.argv[1:]).strip()  # all words after the module name, so quotes are optional
