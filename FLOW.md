@@ -9,7 +9,13 @@ evidence, approve or change the draft, and download the final report.
 
 ## 2. Current status
 - **Stage:** Milestones 1 to 4 complete. **Milestone 5, evals** (raw agent vs graph without critic vs full graph):
-  answer key done (`evals/questions.json`) and runner done (`evals/run_evals.py`), full run 2026-10-30_192104 done and hand-graded, summary script done (`evals/summarize.py`); next: fill in token prices, read the results and write them up.
+  answer key (`evals/questions.json`), runner (`evals/run_evals.py`, with `score_numbers`) and summary script (`evals/summarize.py`) are done.
+  One full run (20 questions x 3 versions, 1 repeat, 2026-10-30_192104) is scored and its 27 text answers (q12-q20) are
+  hand-graded (drafted by Claude Code, all 27 agreed). Strict / percentage-tolerant score, out of 20: raw 19 / 19,
+  graph_no_critic 18 / 20, graph_full 20 / 20; no run errored. Average per question: raw 9.1 s and $0.0006, graph_no_critic
+  21.2 s and $0.0015, graph_full 28.6 s and $0.0025 (prices set in `summarize.py`). The only strict failures are q19 raw
+  (gave an HCLTech revenue, F06) and q09/q10 graph_no_critic (percent format, F05). A second run with 3 repeats
+  (`run_2026-11-01_195047.json`, 33 of 180 results saved so far) is not summarized yet. See `DECISIONS.md` 2026-11-01.
   Milestone 2 (the hand-written loop `raw_agent` with RAG, retrieval eval and grounding rules) still works. The
   Milestone 3 graph works end to end: planner, executor, writer, critic, human review with interrupt and resume, a
   SQLite checkpointer, the `auto_approve` flag and LangSmith tracing. Milestone 4 added the Streamlit app (`app.py`):
@@ -40,7 +46,8 @@ evidence, approve or change the draft, and download the final report.
 - **Failure F03 found and fixed:** the code check passed "2.0 percentage points" that no calculation produced, because
   a number inside the `fetched_at` timestamp rounded to 2.0. `extract_numbers` now ignores ISO dates and times
   (regression test added; details in `evals/FAILURES.md`). It was found with `explain_support`.
-- **Still to do:** more retrieval eval questions (15) and the Milestone 5 comparison of the three agent versions.
+- **Still to do:** finish and summarize the 3-repeat run (point `STAMP` in `summarize.py` at it), write up the Milestone 5
+  comparison, fix the `get_financials` scope/currency problem (F06), and add more retrieval eval questions (15).
 
 ## 3. How one question flows
 Diagram: `docs/graph.mmd`. Run it with `python -m research_agent.graph.run "question"` (`--auto` skips human review).
@@ -87,6 +94,15 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
    exception type only, and the full traceback is printed to the terminal. Model output is shown with `st.markdown`
    without `unsafe_allow_html`, so HTML in an answer is displayed as text.
 
+**Through the evals** (`python -m evals.run_evals`, then `python -m evals.summarize`):
+1. **Run:** for each question and version, `run_one` calls the raw loop (`run_agent`) or `graph.invoke` (new `thread_id`,
+   `auto_approve: True`, `skip_critic` True for `graph_no_critic`). An exception is recorded as `error` and the run goes on.
+   Everything is saved to `evals/results/run_<stamp>.json` after every run, plus a `grading_<stamp>.csv` for q12-q20.
+2. **Grade:** q12-q20 are graded by hand in the CSV's `pass` column (1/0) using the pass rules in `questions.json`.
+3. **Summarize:** q01-q11 are scored by `score_numbers` (strict) and by `score_numbers_percent_ok` (also accepts "22.9%"
+   as 0.229, plain-ratio questions only); q12-q20 use the hand grade in both. `summarize.py` writes the per-version table
+   and the failed-questions table to `summary_<stamp>.md`.
+
 ## 4. Files
 | File | What it does |
 |---|---|
@@ -110,10 +126,11 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `research_agent/rag/search.py` | `search(query, company=None, fy=None, k=5, collection_name="annual_reports_1600")`: Chroma `similarity_search_with_score` with a metadata filter (`$and` when both are given); returns dicts `text`, `company`, `fy`, `pdf_page`, `score` (L2 distance, lower = closer, 3 decimals) |
 | `evals/retrieval_questions.json` | Retrieval answer key: `id`, `company`, `question`, gold `answer_pages` (list of 1-based PDF pages that contain the answer), `answer_snippet`, `note` (other pages, caveats) |
 | `evals/run_retrieval_eval.py` | `python -m evals.run_retrieval_eval [--collection NAME]` (default `annual_reports_1600`): `search(question, company, k=5, collection_name)` per question -> `is_hit(result_pages, answer_pages)` (hit if any result page is a gold page) -> prints HIT/MISS + pages, total and per-company hit rate -> saves `evals/results/retrieval_<collection>_<date>.json` (collection name also inside the file) |
-| `evals/questions.json` | The 20 end-to-end eval questions with a hand-built answer key (Milestone 5 step 1, found without the agent): `accepted_values` (INR crore, % or ratio), `tolerance`, `expected_points`, `expected_pages` (`company` + `pdf_page`), `notes` (sources, formulas, wrong-but-tempting figures). Scoring is not written yet |
-| `evals/run_evals.py` | Eval runner shell: `python -m evals.run_evals [--versions raw graph_no_critic graph_full] [--ids q02 q18] [--repeats N]`. Runs each question on each version (graph runs: new `thread_id`, `recursion_limit` 30, `auto_approve: True`, `skip_critic` True/False; tokens from `UsageMetadataCallbackHandler`; raw tokens from the loop's own totals), records answer, evidence, seconds, tokens and any error, saves `evals/results/run_<date>_<time>.json` (after every run) and `grading_<date>_<time>.csv` (q12-q20, empty `pass` column). `score_numbers` is a stub (`NotImplementedError`) for you to write |
-| `evals/summarize.py` | `python -m evals.summarize`: scores q01-q11 with `score_numbers`, reads your hand grades (`pass` column, q12-q20) from the grading CSV, and writes `summary_<stamp>.md` (per-version score, time, tokens, cost, errors; list of failed questions). Token prices are constants at the top. |
-| `evals/FAILURES.md` | Hand-found agent failures (F01 wrong CEO, F02 answer from model knowledge, F03 code check fooled by a timestamp): cause, fix, result or remaining risk |
+| `evals/questions.json` | The 20 end-to-end eval questions with a hand-built answer key (Milestone 5 step 1, found without the agent): `accepted_values` (INR crore, % or ratio), `tolerance`, `expected_points`, `expected_pages` (`company` + `pdf_page`), `notes` (sources, formulas, wrong-but-tempting figures). Scored by `run_evals.score_numbers` (q01-q11) and by hand (q12-q20) |
+| `evals/run_evals.py` | Eval runner and strict scorer: `python -m evals.run_evals [--versions raw graph_no_critic graph_full] [--ids q02 q18] [--repeats N]`. Runs each question on each version (graph runs: new `thread_id`, `recursion_limit` 30, `auto_approve: True`, `skip_critic` True/False; tokens from `UsageMetadataCallbackHandler`; raw tokens from the loop's own totals), records answer, evidence, seconds, tokens and any error, saves `evals/results/run_<date>_<time>.json` (after every run) and `grading_<date>_<time>.csv` (q12-q20, empty `pass` column). `score_numbers(answer, item)` (strict): `extract_numbers` on the answer, then any number within `tolerance` of an `accepted_values` entry (for comparisons, every `required_groups` group needs a match) |
+| `evals/summarize.py` | `python -m evals.summarize` (run with the project `.venv` Python): scores q01-q11 with `score_numbers` (strict) and `score_numbers_percent_ok` (also accepts "X%" as X/100, only for plain-ratio questions), reads the hand grades (`pass` column, q12-q20) from the grading CSV, and writes `summary_<stamp>.md`: per-version table (numbers strict and tolerant, text, overall strict and tolerant, average seconds / tokens / cost, errors) and the failed questions with a "passes % tolerant" column. `STAMP` and the token prices (`INPUT_PRICE_PER_M`, `OUTPUT_PRICE_PER_M`) are constants at the top |
+| `evals/results/` | Eval outputs: `run_<stamp>.json` (all answers, evidence, seconds, tokens, errors), `grading_<stamp>.csv` (hand-graded q12-q20), `grading_<stamp>_draft.csv` (Claude Code's draft grades with `reason`, kept unchanged), `summary_<stamp>.md`, retrieval-eval JSON files, and `tests/` (earlier trial runs) |
+| `evals/FAILURES.md` | Hand-found agent failures (F01 wrong CEO, F02 answer from model knowledge, F03 code check fooled by a timestamp, F04 F01 back after the rebuild, F05 ratios written as percentages, F06 raw agent answered an out-of-scope company with wrong data): cause, fix, result or remaining risk |
 | `research_agent/config.py` | Empty (placeholder) |
 | `research_agent/**/__init__.py` | Empty package markers |
 | `tests/test_calculator.py` | Valid/decimal/divide-by-zero/malicious-input tests for the calculator |
@@ -203,6 +220,15 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   as USD but the values are rupees, so revenue comes out about 100x too large (11,496,351.66 "crore"). Infosys is
   genuinely in USD and converts correctly, but its balance-sheet items use the *average* rate, not the year-end rate
   (equity 86,445 vs 92,852 in the report).
+- **Eval scoring caveats (Milestone 5):** the tolerant score is a second, separate number; the strict `score_numbers` was
+  not changed after seeing results. The 27 text grades were drafted by Claude Code and then reviewed (27 of 27 agreed),
+  so they are not independent of its judgement; hedged answers (q15-q17 graph_full) and the refusals (q19, q20) were
+  the judgement calls. The first full run used 1 repeat, so one run per cell cannot show run-to-run variation; the
+  3-repeat run is still unsummarized. Number scoring only checks that some extracted number is within tolerance of an
+  accepted value, not that the answer uses it correctly.
+- **Out-of-scope tickers (F06, not fixed):** `get_financials` accepts any ticker and the raw agent has no scope check, so
+  it answered HCLTech with a revenue about 100x too high. The graph's planner refuses such questions in under 2 s.
+  Plan: make the tool reject tickers other than TCS, INFY and WIPRO.
 - **Token cost (one measurement):** every `search_reports` call returns up to 5 chunks of up to 1,600 chars (about
   2,000 tokens by chars / 4). The loop sends the whole message list on every round, so a tool result is paid for
   again in each later round, and the rules allow up to 2 extra searches per fact. The long `search_reports`
