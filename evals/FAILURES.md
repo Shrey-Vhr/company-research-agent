@@ -53,6 +53,9 @@
   one ungrounded figure, not factual correctness; (2) the scorer should
   accept percentage forms of ratios; (3) the writer prompt should keep
   numbers in the evidence's form; (4) remove duplicate critique items
+- Repeat run (3x): graph_no_critic wrote percentages on q09 and q10 in 6 of 6
+  runs; graph_full used ratios on q09 in 3 of 3 but percentages on q10 in 2 of
+  3, so the critic's format fix is not reliable.
 
 ## F06: Raw agent answered an out-of-scope company with wrong data (2026-10-30)
 - Run: q19, raw. Answer: HCLTech revenue ~₹1,14,96,351 crore (about 100x too high)
@@ -61,3 +64,5 @@
 - Graph versions refused in under 2 s (planner scope check)
 - Lesson: the clearest real advantage of the graph in this eval is safety on
   out-of-scope questions. Fix the tool to reject tickers outside TCS, INFY, WIPRO.
+- Repeat run: raw gave the wrong HCLTech revenue in 3 of 3; both graph
+  versions refused in 3 of 3.
