@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from langchain_community.document_loaders import PyMuPDFLoader
+import pymupdf
+from langchain_core.documents import Document
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reports"
 
@@ -17,33 +18,35 @@ REPORTS = {
 MIN_CHARS = 50
 
 # Page numbering (checked on all three PDFs):
-# - PyMuPDFLoader's metadata["page"] starts at 0.
+# - pymupdf numbers pages from 0 (enumerate below).
 # - The printed number on a page is not usable: the PDFs have no page labels, many PDF pages are
 #   two-page spreads (TCS PDF page 21 shows printed pages 38 and 39), and the extracted text
 #   sometimes splits digits ("1 31" for 131).
-# So we cite pdf_page = metadata["page"] + 1, the number you type into a PDF viewer to check it.
+# So we cite pdf_page = index + 1, the number you type into a PDF viewer to check it.
 
 
 def load_report(path, company, fy):
     """Return one Document per non-empty page of one PDF, with company, fy and pdf_page in metadata."""
-    pages = PyMuPDFLoader(str(path)).load()
     docs = []
-    for page in pages:
-        text = page.page_content.strip()
-        if len(text) < MIN_CHARS:
-            continue
-        page.page_content = text
-        # Replace the loader's metadata (creator, producer, dates...) with only what we filter or cite on.
-        page.metadata = {
-            "company": company,
-            "fy": fy,
-            "source": Path(path).name,
-            "pdf_page": page.metadata["page"] + 1,  # 1-based PDF page; see note above
-            "total_pages": page.metadata["total_pages"],
-        }
-        docs.append(page)
-    print(f"{Path(path).name}: kept {len(docs)} of {len(pages)} pages "
-          f"(skipped {len(pages) - len(docs)} with < {MIN_CHARS} chars); citing pdf_page (1-based)")
+    with pymupdf.open(path) as pdf:
+        total_pages = len(pdf)
+        for index, page in enumerate(pdf):  # index starts at 0
+            text = page.get_text().strip()
+            if len(text) < MIN_CHARS:
+                continue
+            docs.append(Document(
+                page_content=text,
+                # Only what we filter or cite on.
+                metadata={
+                    "company": company,
+                    "fy": fy,
+                    "source": Path(path).name,
+                    "pdf_page": index + 1,  # 1-based PDF page; see note above
+                    "total_pages": total_pages,
+                },
+            ))
+    print(f"{Path(path).name}: kept {len(docs)} of {total_pages} pages "
+          f"(skipped {total_pages - len(docs)} with < {MIN_CHARS} chars); citing pdf_page (1-based)")
     return docs
 
 

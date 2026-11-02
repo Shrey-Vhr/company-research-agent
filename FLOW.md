@@ -119,7 +119,7 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `research_agent/tools/financials.py` | yfinance download, ₹ crore conversion, USD→INR, cache; `get_financials` tool |
 | `research_agent/tools/calculator.py` | `safe_eval` (safe `ast` arithmetic) and the `calculate` tool |
 | `research_agent/tools/reports.py` | `search_reports` tool: wraps `search(k=5)` and returns `text` + `citation` per passage; its long docstring is the tool description the model sees |
-| `research_agent/rag/loader.py` | `load_reports`: PyMuPDFLoader, one Document per page, skips pages under 50 chars, metadata `company` (NSE ticker: TCS, INFY, WIPRO), `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
+| `research_agent/rag/loader.py` | `load_reports`: reads PDFs with `pymupdf` directly, one Document per page, skips pages under 50 chars, metadata `company` (NSE ticker: TCS, INFY, WIPRO), `fy`, `source`, `pdf_page` (1-based), `total_pages`; `__main__` prints sample pages |
 | `research_agent/rag/chunker.py` | `chunk_documents(docs, chunk_size=3200, chunk_overlap=400)`: `RecursiveCharacterTextSplitter` (default separators, 3,200 chars, 400 overlap) via `split_documents`, so chunks keep page metadata, then adds `chunk` (1, 2, … within each page); `__main__` prints counts and a sample chunk |
 | `research_agent/rag/store.py` | `get_store(collection_name="annual_reports")`: the named Chroma collection in `data/chroma`, `OpenAIEmbeddings(EMBEDDING_MODEL)`; `add_chunks(chunks, collection_name)`: upserts in batches of 100 with IDs like `tcs-fy2025-26-p181-c2` |
 | `scripts/build_index.py` | Builds the index (`python -m scripts.build_index`, defaults `--chunk-size 1600 --chunk-overlap 200 --collection annual_reports_1600`): `load_reports` -> `chunk_documents` -> prints chunk count, ~tokens (chars/4) and cost (`PRICE_PER_MILLION_TOKENS`, still empty) -> asks y/n -> `add_chunks` -> prints collection size |
@@ -207,9 +207,8 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   with no error. There is no score cutoff, so it always returns k chunks even when none is relevant
   ("number of employees" for INFY: best match is p. 143, about customers). Scores bunch together (about 1.0–1.25),
   so they don't separate good and bad matches well. `get_store()` is rebuilt on every search call.
-- **Deprecated loader dependency:** the loader uses `PyMuPDFLoader` from `langchain-community`, which pytest
-  warns is being sunset and no longer maintained. It works now. Versions are pinned in `requirements.txt`;
-  plan: replace it with `pymupdf` directly in Milestone 6.
+- **Playground leftover:** `playground/compare_loaders.py` still imports `langchain-community` (no longer in
+  `requirements.txt`); the app does not use it.
 - **Profit definition (cause found, agent not changed):** for TCS FY2025-26, yfinance net income ₹49,210 crore is the
   reported profit attributable to shareholders (p. 167, p. 35). The ₹52,820 crore on p. 69 is profit *excluding
   exceptional items* (footnote on p. 69; margin 19.8%). Wipro's yfinance net income is also the equity-holders figure
