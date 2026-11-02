@@ -1,9 +1,12 @@
 """Data helper: load the annual-report PDFs as one LangChain Document per page."""
 
+import logging
 from pathlib import Path
 
 import pymupdf
 from langchain_core.documents import Document
+
+logger = logging.getLogger(__name__)
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reports"
 
@@ -25,7 +28,7 @@ MIN_CHARS = 50
 # So we cite pdf_page = index + 1, the number you type into a PDF viewer to check it.
 
 
-def load_report(path, company, fy):
+def load_report(path: str | Path, company: str, fy: str) -> list[Document]:
     """Return one Document per non-empty page of one PDF, with company, fy and pdf_page in metadata."""
     docs = []
     with pymupdf.open(path) as pdf:
@@ -34,23 +37,31 @@ def load_report(path, company, fy):
             text = page.get_text().strip()
             if len(text) < MIN_CHARS:
                 continue
-            docs.append(Document(
-                page_content=text,
-                # Only what we filter or cite on.
-                metadata={
-                    "company": company,
-                    "fy": fy,
-                    "source": Path(path).name,
-                    "pdf_page": index + 1,  # 1-based PDF page; see note above
-                    "total_pages": total_pages,
-                },
-            ))
-    print(f"{Path(path).name}: kept {len(docs)} of {total_pages} pages "
-          f"(skipped {total_pages - len(docs)} with < {MIN_CHARS} chars); citing pdf_page (1-based)")
+            docs.append(
+                Document(
+                    page_content=text,
+                    # Only what we filter or cite on.
+                    metadata={
+                        "company": company,
+                        "fy": fy,
+                        "source": Path(path).name,
+                        "pdf_page": index + 1,  # 1-based PDF page; see note above
+                        "total_pages": total_pages,
+                    },
+                )
+            )
+    logger.info(
+        "%s: kept %d of %d pages (skipped %d with < %d chars); citing pdf_page (1-based)",
+        Path(path).name,
+        len(docs),
+        total_pages,
+        total_pages - len(docs),
+        MIN_CHARS,
+    )
     return docs
 
 
-def load_reports(reports_dir=REPORTS_DIR):
+def load_reports(reports_dir: str | Path = REPORTS_DIR) -> list[Document]:
     """Load every report listed in REPORTS. Raises FileNotFoundError if one is missing."""
     docs = []
     for file_name, (company, fy) in REPORTS.items():
@@ -62,6 +73,7 @@ def load_reports(reports_dir=REPORTS_DIR):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     docs = load_reports()
     print(f"Total: {len(docs)} pages")
     # Print a few pages from each report to eyeball the text and metadata.

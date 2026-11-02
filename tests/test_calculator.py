@@ -5,7 +5,9 @@ from research_agent.tools.calculator import calculate, safe_eval
 
 def test_valid_expression():
     # TCS revenue growth FY2023-24 -> FY2024-25
-    assert safe_eval("(255324 - 240893) / 240893 * 100") == pytest.approx(5.99063, rel=1e-5)
+    assert safe_eval("(255324 - 240893) / 240893 * 100") == pytest.approx(
+        5.99063, rel=1e-5
+    )
 
 
 def test_decimals():
@@ -18,16 +20,19 @@ def test_divide_by_zero_is_a_clear_error():
         safe_eval("1 / 0")
 
 
-@pytest.mark.parametrize("expression", [
-    "__import__('os')",
-    "__import__('os').system('echo hacked')",
-    "2**100000",
-    "2 ** 100000",
-    "7 // 2",
-    "open('secrets.txt')",
-    "().__class__",
-    "abs(-3)",
-])
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "__import__('os')",
+        "__import__('os').system('echo hacked')",
+        "2**100000",
+        "2 ** 100000",
+        "7 // 2",
+        "open('secrets.txt')",
+        "().__class__",
+        "abs(-3)",
+    ],
+)
 def test_malicious_or_unsupported_input_is_rejected(expression, monkeypatch):
     # If anything slipped through and ran a shell command, this would record it.
     calls = []

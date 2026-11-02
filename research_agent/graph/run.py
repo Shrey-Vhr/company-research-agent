@@ -3,10 +3,11 @@ import uuid
 
 from langgraph.types import Command
 
+from research_agent.config import RECURSION_LIMIT
 from research_agent.graph.build import build_graph
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     auto = "--auto" in args
     no_critic = "--no-critic" in args
@@ -17,7 +18,10 @@ def main():
         if len(args) != 2:
             sys.exit("Usage: python -m research_agent.graph.run --resume <thread_id>")
         thread_id = args[1]
-        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 30}
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": RECURSION_LIMIT,
+        }
         # a paused run has a pending interrupt stored in the checkpoint
         pending = [i for t in graph.get_state(config).tasks for i in t.interrupts]
         if not pending:
@@ -27,9 +31,14 @@ def main():
     else:
         question = " ".join(args).strip()
         if not question:
-            sys.exit('Usage: python -m research_agent.graph.run "your question" [--auto] [--no-critic] | --resume <thread_id>')
+            sys.exit(
+                'Usage: python -m research_agent.graph.run "your question" [--auto] [--no-critic] | --resume <thread_id>'
+            )
         thread_id = str(uuid.uuid4())
-        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 30}
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": RECURSION_LIMIT,
+        }
         print(f"Thread ID: {thread_id}  (resume with --resume {thread_id})")
         start = {"question": question, "evidence": []}
         if auto:

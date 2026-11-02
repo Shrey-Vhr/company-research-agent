@@ -11,7 +11,13 @@ import re
 import sys
 from collections import Counter
 
-from evals.run_evals import GRADING_IDS, QUESTIONS_FILE, RESULTS_DIR, VERSIONS, score_numbers
+from evals.run_evals import (
+    GRADING_IDS,
+    QUESTIONS_FILE,
+    RESULTS_DIR,
+    VERSIONS,
+    score_numbers,
+)
 
 STAMP = sys.argv[1] if len(sys.argv) > 1 else "2026-11-01_195047"
 RUN_FILE = RESULTS_DIR / f"run_{STAMP}.json"
@@ -42,32 +48,46 @@ def load_passes(questions_by_id, results):
     q01-q11: score_numbers (strict) and score_numbers_percent_ok (lenient). q12-q20: your 'pass' column in both.
     The grading CSV has no repeat column: rows are in run order, so the nth row of an (id, version) is repeat n."""
     passes, lenient = {}, {}
-    answers = {(r["id"], r["version"], r["repeat"]): r["answer"] or r["error"] or "" for r in results}
+    answers = {
+        (r["id"], r["version"], r["repeat"]): r["answer"] or r["error"] or ""
+        for r in results
+    }
     for r in results:
         if r["id"] not in GRADING_IDS:
             item = questions_by_id[r["id"]]
             key = (r["id"], r["version"], r["repeat"])
             passes[key] = bool(r["answer"]) and score_numbers(r["answer"], item)
-            lenient[key] = bool(r["answer"]) and score_numbers_percent_ok(r["answer"], item)
+            lenient[key] = bool(r["answer"]) and score_numbers_percent_ok(
+                r["answer"], item
+            )
     seen = Counter()
     with open(GRADING_FILE, encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             seen[(row["id"], row["version"])] += 1
             key = (row["id"], row["version"], seen[(row["id"], row["version"])])
-            assert row["answer"] == answers[key], f"grading row does not match the run file: {key}"
-            assert row["pass"].strip() in ("0", "1"), f"pass column is empty or not 0/1: {key}"
+            assert row["answer"] == answers[key], (
+                f"grading row does not match the run file: {key}"
+            )
+            assert row["pass"].strip() in ("0", "1"), (
+                f"pass column is empty or not 0/1: {key}"
+            )
             passes[key] = lenient[key] = row["pass"].strip() == "1"
     return passes, lenient
 
 
 def table(header, rows):
-    lines = ["| " + " | ".join(header) + " |", "|" + "|".join("---" for _ in header) + "|"]
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|" + "|".join("---" for _ in header) + "|",
+    ]
     lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
     return "\n".join(lines)
 
 
 def main():
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # answers contain the rupee sign
+    sys.stdout.reconfigure(
+        encoding="utf-8", errors="replace"
+    )  # answers contain the rupee sign
     questions = json.loads(QUESTIONS_FILE.read_text(encoding="utf-8"))
     questions_by_id = {q["id"]: q for q in questions}
     run = json.loads(RUN_FILE.read_text(encoding="utf-8"))
@@ -89,32 +109,88 @@ def main():
         avg_out = sum(r["output_tokens"] for r in runs) / n
         cost = avg_in * INPUT_PRICE_PER_M / 1e6 + avg_out * OUTPUT_PRICE_PER_M / 1e6
         total = (N_NUMBER + N_TEXT) * repeats
-        metrics.append([version, f"{num_ok}/{N_NUMBER * repeats}", f"{num_ok2}/{N_NUMBER * repeats}",
-                        f"{text_ok}/{N_TEXT * repeats}", f"{num_ok + text_ok}/{total}", f"{num_ok2 + text_ok}/{total}",
-                        f"{sum(r['seconds'] for r in runs) / n:.1f}", f"{avg_in:.0f}", f"{avg_out:.0f}",
-                        f"${cost:.4f}", sum(1 for r in runs if r["error"])])
+        metrics.append(
+            [
+                version,
+                f"{num_ok}/{N_NUMBER * repeats}",
+                f"{num_ok2}/{N_NUMBER * repeats}",
+                f"{text_ok}/{N_TEXT * repeats}",
+                f"{num_ok + text_ok}/{total}",
+                f"{num_ok2 + text_ok}/{total}",
+                f"{sum(r['seconds'] for r in runs) / n:.1f}",
+                f"{avg_in:.0f}",
+                f"{avg_out:.0f}",
+                f"${cost:.4f}",
+                sum(1 for r in runs if r["error"]),
+            ]
+        )
         for r in runs:
             if not passes[key(r)]:
-                answer = (r["answer"] or r["error"] or "").replace("\n", " ").replace("|", "\\|")
-                failures.append([r["id"], version, r["repeat"], "yes" if lenient[key(r)] else "no", answer[:150]])
+                answer = (
+                    (r["answer"] or r["error"] or "")
+                    .replace("\n", " ")
+                    .replace("|", "\\|")
+                )
+                failures.append(
+                    [
+                        r["id"],
+                        version,
+                        r["repeat"],
+                        "yes" if lenient[key(r)] else "no",
+                        answer[:150],
+                    ]
+                )
 
     rates = []
     for item in questions:
         row = [item["id"]]
         for version in VERSIONS:
-            runs = [r for r in results if r["id"] == item["id"] and r["version"] == version]
-            row += [f"{sum(passes[key(r)] for r in runs)}/{len(runs)}", f"{sum(lenient[key(r)] for r in runs)}/{len(runs)}"]
+            runs = [
+                r for r in results if r["id"] == item["id"] and r["version"] == version
+            ]
+            row += [
+                f"{sum(passes[key(r)] for r in runs)}/{len(runs)}",
+                f"{sum(lenient[key(r)] for r in runs)}/{len(runs)}",
+            ]
         rates.append(row)
 
     out = f"## Results by version (averaged over {repeats} repeats; passes out of {(N_NUMBER + N_TEXT) * repeats})\n\n"
-    out += table(["version", f"numbers strict (of {N_NUMBER * repeats})", f"numbers % tolerant (of {N_NUMBER * repeats})",
-                  f"text/names/refusals (of {N_TEXT * repeats})", f"overall strict (of {(N_NUMBER + N_TEXT) * repeats})",
-                  f"overall % tolerant (of {(N_NUMBER + N_TEXT) * repeats})", "avg seconds",
-                  "avg input tokens", "avg output tokens", "avg cost per question", "runs with error"], metrics)
+    out += table(
+        [
+            "version",
+            f"numbers strict (of {N_NUMBER * repeats})",
+            f"numbers % tolerant (of {N_NUMBER * repeats})",
+            f"text/names/refusals (of {N_TEXT * repeats})",
+            f"overall strict (of {(N_NUMBER + N_TEXT) * repeats})",
+            f"overall % tolerant (of {(N_NUMBER + N_TEXT) * repeats})",
+            "avg seconds",
+            "avg input tokens",
+            "avg output tokens",
+            "avg cost per question",
+            "runs with error",
+        ],
+        metrics,
+    )
     out += "\n\n## Pass rate per question (strict / % tolerant, out of the repeats)\n\n"
-    out += table(["id"] + [f"{v} {kind}" for v in VERSIONS for kind in ("strict", "tolerant")], rates)
+    out += table(
+        ["id"] + [f"{v} {kind}" for v in VERSIONS for kind in ("strict", "tolerant")],
+        rates,
+    )
     out += "\n\n## Failed runs (strict scoring)\n\n"
-    out += table(["id", "version", "repeat", "passes % tolerant", "answer (first 150 chars)"], failures) if failures else "No failures."
+    out += (
+        table(
+            [
+                "id",
+                "version",
+                "repeat",
+                "passes % tolerant",
+                "answer (first 150 chars)",
+            ],
+            failures,
+        )
+        if failures
+        else "No failures."
+    )
     print(out)
     SUMMARY_FILE.write_text(out + "\n", encoding="utf-8")
     print(f"\nSaved {SUMMARY_FILE}")

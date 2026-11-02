@@ -27,6 +27,24 @@ def test_page_citations_are_ignored():
     assert extract_numbers("revenue 500 (pp. 70-72)") == [500.0]
 
 
+def test_page_lists_and_dash_variants_are_ignored():
+    assert extract_numbers("revenue 500 (pp. 132-135, 166)") == [500.0]
+    assert extract_numbers("revenue 500 (pp. 132–135)") == [500.0]
+    assert extract_numbers("revenue 500 (pp. 132—135)") == [500.0]
+    assert extract_numbers("revenue 500 (p. 14, 19)") == [500.0]
+
+
+def test_infosys_citation_page_166_is_not_a_claim():
+    draft = "Revenue was 500 crore (Infosys Annual Report FY2025-26, pp. 132–135, 166)."
+    assert extract_numbers(draft) == [500.0]
+    assert find_unsupported(draft, ["revenue 500"]) == []
+
+
+def test_real_number_after_citation_is_still_extracted():
+    draft = "(pp. 132–135, 166) margin was 24.3% on revenue 500"
+    assert extract_numbers(draft) == [24.3, 500.0]
+
+
 def test_no_numbers():
     assert extract_numbers("no figures here") == []
 

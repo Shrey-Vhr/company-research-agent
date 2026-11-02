@@ -7,11 +7,11 @@ from pathlib import Path
 import streamlit as st
 from langgraph.types import Command
 
+from research_agent.config import MAX_RUNS_PER_DAY, RECURSION_LIMIT
 from research_agent.graph.build import build_graph
 
-MAX_RUNS_PER_DAY = 20
 USAGE_DB = Path("data/usage.sqlite")
-GITHUB_URL = "https://github.com/your-username/Company-Research-Agent"  # change to your repo
+GITHUB_URL = "https://github.com/Shrey-Vhr/company-research-agent"
 DISCLAIMER = "This is for information only and is not investment advice."
 
 EXAMPLES = [
@@ -27,25 +27,32 @@ def get_graph():
     return build_graph()
 
 
-def run_config():
-    return {"configurable": {"thread_id": st.session_state.thread_id}, "recursion_limit": 30}
+def run_config() -> dict:
+    return {
+        "configurable": {"thread_id": st.session_state.thread_id},
+        "recursion_limit": RECURSION_LIMIT,
+    }
 
 
-def usage_db():
+def usage_db() -> sqlite3.Connection:
     """Open the usage database, creating the folder and table on first use."""
     USAGE_DB.parent.mkdir(exist_ok=True)
     conn = sqlite3.connect(USAGE_DB)
-    conn.execute("CREATE TABLE IF NOT EXISTS usage (date TEXT PRIMARY KEY, count INTEGER NOT NULL)")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS usage (date TEXT PRIMARY KEY, count INTEGER NOT NULL)"
+    )
     return conn
 
 
-def runs_today():
+def runs_today() -> int:
     with usage_db() as conn:
-        row = conn.execute("SELECT count FROM usage WHERE date = ?", (date.today().isoformat(),)).fetchone()
+        row = conn.execute(
+            "SELECT count FROM usage WHERE date = ?", (date.today().isoformat(),)
+        ).fetchone()
     return row[0] if row else 0
 
 
-def count_run():
+def count_run() -> None:
     with usage_db() as conn:
         conn.execute(
             "INSERT INTO usage (date, count) VALUES (?, 1) "
@@ -54,23 +61,23 @@ def count_run():
         )
 
 
-def safe_invoke(payload):
+def safe_invoke(payload: dict | Command) -> bool:
     """Run graph.invoke; on any exception show a short error and return False."""
     try:
         graph.invoke(payload, run_config())
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - any graph failure is shown as a short message, never a crash
         traceback.print_exc()  # full traceback goes to the terminal only
         st.error("Something went wrong while researching. Please try again.")
         st.caption(f"Error type: {type(e).__name__}")
         return False
 
 
-def set_question(text):
+def set_question(text: str) -> None:
     st.session_state["question"] = text
 
 
-def footer():
+def footer() -> None:
     st.divider()
     st.caption(DISCLAIMER)
 
@@ -95,7 +102,9 @@ st.markdown(f"[GitHub repo]({GITHUB_URL})")
 question = st.text_area("Your question", key="question", height=100)
 cols = st.columns(len(EXAMPLES))
 for col, example in zip(cols, EXAMPLES):
-    col.button(example, on_click=set_question, args=(example,), use_container_width=True)
+    col.button(
+        example, on_click=set_question, args=(example,), use_container_width=True
+    )
 
 # The research runs ONLY on the rerun caused by clicking Run
 if st.button("Run", type="primary"):
@@ -108,7 +117,9 @@ if st.button("Run", type="primary"):
     else:
         count_run()
         st.session_state.thread_id = str(uuid.uuid4())
-        st.query_params["thread"] = st.session_state.thread_id  # so a refresh can find this run
+        st.query_params["thread"] = (
+            st.session_state.thread_id
+        )  # so a refresh can find this run
         with st.spinner("Researching... this takes about 30 seconds"):
             safe_invoke({"question": question.strip(), "evidence": []})
 
@@ -132,10 +143,12 @@ if state.get("plan"):
 # 5. Evidence (without the long raw content)
 if state.get("evidence"):
     st.header("Evidence")
-    st.table([
-        {"step": e["step"], "tool": e["tool"], "source": e["citation"]}
-        for e in state["evidence"]
-    ])
+    st.table(
+        [
+            {"step": e["step"], "tool": e["tool"], "source": e["citation"]}
+            for e in state["evidence"]
+        ]
+    )
 
 # 6. Draft, shown only while the graph waits for approval
 if paused:

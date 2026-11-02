@@ -8,6 +8,7 @@ import json
 from datetime import date
 from pathlib import Path
 
+from research_agent.config import COLLECTION_NAME
 from research_agent.rag.search import search
 
 EVALS_DIR = Path(__file__).resolve().parent
@@ -26,7 +27,7 @@ def is_hit(result_pages, answer_pages):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--collection", default="annual_reports_1600")
+    parser.add_argument("--collection", default=COLLECTION_NAME)
     args = parser.parse_args()
 
     items = json.loads(QUESTIONS_FILE.read_text(encoding="utf-8"))
@@ -34,19 +35,28 @@ if __name__ == "__main__":
 
     rows = []
     for item in items:
-        results = search(item["question"], company=item["company"], k=K, collection_name=args.collection)
+        results = search(
+            item["question"],
+            company=item["company"],
+            k=K,
+            collection_name=args.collection,
+        )
         result_pages = [r["pdf_page"] for r in results]
         hit = is_hit(result_pages, item["answer_pages"])
-        print(f'{item["id"]}  {item["company"]:<6} {"HIT " if hit else "MISS"}  pages {result_pages}')
-        rows.append({
-            "id": item["id"],
-            "company": item["company"],
-            "question": item["question"],
-            "answer_pages": item["answer_pages"],
-            "result_pages": result_pages,
-            "scores": [r["score"] for r in results],
-            "hit": hit,
-        })
+        print(
+            f"{item['id']}  {item['company']:<6} {'HIT ' if hit else 'MISS'}  pages {result_pages}"
+        )
+        rows.append(
+            {
+                "id": item["id"],
+                "company": item["company"],
+                "question": item["question"],
+                "answer_pages": item["answer_pages"],
+                "result_pages": result_pages,
+                "scores": [r["score"] for r in results],
+                "hit": hit,
+            }
+        )
 
     hits = sum(row["hit"] for row in rows)
     print(f"\nTotal hit rate: {hits}/{len(rows)} = {hits / len(rows):.0%}")
@@ -56,10 +66,14 @@ if __name__ == "__main__":
         company_hits, company_total = by_company.get(row["company"], (0, 0))
         by_company[row["company"]] = (company_hits + row["hit"], company_total + 1)
     for company, (company_hits, company_total) in by_company.items():
-        print(f"  {company:<6} {company_hits}/{company_total} = {company_hits / company_total:.0%}")
+        print(
+            f"  {company:<6} {company_hits}/{company_total} = {company_hits / company_total:.0%}"
+        )
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    out_file = RESULTS_DIR / f"retrieval_{args.collection}_{date.today().isoformat()}.json"
+    out_file = (
+        RESULTS_DIR / f"retrieval_{args.collection}_{date.today().isoformat()}.json"
+    )
     summary = {
         "date": date.today().isoformat(),
         "collection": args.collection,

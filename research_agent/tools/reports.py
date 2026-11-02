@@ -6,7 +6,9 @@ COMPANY_NAMES = {"TCS": "TCS", "INFY": "Infosys", "WIPRO": "Wipro"}
 
 
 @tool
-def search_reports(query: str, company: str | None = None, fy: str | None = None) -> list[dict]:
+def search_reports(
+    query: str, company: str | None = None, fy: str | None = None
+) -> list[dict]:
     """Search the annual reports of Indian IT companies for facts written in the text.
 
     Use this for anything stated in an annual report: headcount, dividends,
@@ -41,8 +43,10 @@ def search_reports(query: str, company: str | None = None, fy: str | None = None
     output = []
     for r in results:
         name = COMPANY_NAMES.get(r["company"], r["company"])
-        output.append({
-            "text": r["text"],
-            "citation": f"{name} Annual Report {r['fy']}, p. {r['pdf_page']}",
-        })
+        output.append(
+            {
+                "text": r["text"],
+                "citation": f"{name} Annual Report {r['fy']}, p. {r['pdf_page']}",
+            }
+        )
     return output

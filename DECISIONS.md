@@ -416,3 +416,24 @@
 - Why: A ratio of 0.229 and 22.9% are the same value, so failing it would measure formatting, not correctness. But changing the original scorer after seeing the results would look like moving the goalposts. Keeping the strict score and adding a separate tolerant one shows both, so a reader can see exactly how much of the gap is format and how much is wrong numbers. Points from the discussion: the strict score is the original, unchanged definition of correct. The tolerant score shows how much of the gap is formatting and how much is wrong numbers. Reporting both keeps the comparison honest, because the two scores give different rankings for graph_no_critic.
 - Trade-off: Two numbers per version are harder to read than one. The tolerant rule could pass a wrong answer that happens to match after dividing by 100, which is why it is limited to q09 and q10. The text grades were drafted by Claude Code, which also helped build parts of this project. Agreement on all 27 rows shows I accepted the drafts, not that they're independent of Claude's judgement. The q15-q17 graph_full hedges ("does not clearly state...") and the q19 and q20 refusals are the judgement calls.
 - Result (if measured): Numbers, graph_no_critic: 9/11 strict, 11/11 tolerant. Overall, graph_no_critic: 18/20 strict, 20/20 tolerant. raw: 19/20 on both scores (its only fail is q19, which gave an HCLTech revenue number). graph_full: 20/20 on both. The tolerant score is the only thing that changes the ranking between graph_no_critic and graph_full.
+
+## 2026-11-02: Settings moved to config.py
+- Problem / context: model names, round and revision limits, chunk size, collection name and daily cap were scattered across files, and chunker, store and build script disagreed on defaults.
+- Options considered: leave as is; one config.py with .env overrides.
+- Chose: config.py, with defaults equal to the values used in the evals. Model names have no default: they are read from .env when first used.
+- Why: one place to change; the index and eval defaults can't drift apart.
+- Trade-off: a missing model name fails with a clear error instead of a KeyError.
+
+## 2026-11-02: Send change requests through a replanner node
+
+- Problem / context: In human review, "Request changes" sent the run straight back to the writer. The writer can only use the evidence already collected, so a request that needed a new fact (for example "who is the CEO?") could not be answered (F07).
+- Options considered:
+  1. Keep sending feedback to the writer and tell the user to ask a new question.
+  2. Send the feedback back to the planner and rerun the whole plan.
+  3. Add a replanner node that turns the feedback into only the extra steps needed, then sends the run to the executor or the writer.
+- Chose: Option 3. `human_review` routes to `replanner` when there is feedback, and to `finalize` on approve. The replanner makes one structured-output call with the question, the steps already done and the change request. It returns a list of new steps, appended to `plan`, with `current_step` set to the old plan length. `after_replanner` then routes:
+  - new steps go to the executor, then the writer, critic and review again;
+  - an empty list (wording-only or out-of-scope request) goes straight to the writer.
+- Why: Only the replanner can add steps. It reuses the existing executor, writer and critic. Executing only the new steps keeps finished work and does not repeat tool calls. The re-test found Salil Parekh, p. 14.
+- Trade-off: Every change request now makes an extra model call, even for "make it shorter". The scope check for new steps is only in the replanner prompt. Both after_replanner branches are tested (tests/test_routing.py, 17 routing tests).
+- Result (if measured): one re-test (F07): the request now fetched the CEO's name. Not measured on cost or latency.

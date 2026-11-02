@@ -68,3 +68,10 @@
   versions refused in 3 of 3.
 
 - Fixed in v1.0: get_financials rejects tickers outside TCS, INFY, WIPRO.
+
+## F07: Revise requests could not fetch new facts (2026-11-02)
+- Fixed with a replanner node; re-test found Salil Parekh, p. 14.
+
+## F08: Critic flagged a page number as an unsupported figure (2026-11-02)
+- The critic flagged a page number from a pp. citation list as an unsupported figure.
+- Fixed in extract_numbers; regression test added.

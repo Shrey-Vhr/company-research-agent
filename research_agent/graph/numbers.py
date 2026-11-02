@@ -1,12 +1,21 @@
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 # Things that look like numbers but are labels, removed before extracting.
 # ISO dates and times (2026-03-31, 2026-10-26T11:02:00.003372+00:00, 11:02:00) go first,
 # so the FY pattern below cannot half-match a date.
 _TIME = r"\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
 ISO_DATETIME = re.compile(rf"\b\d{{4}}-\d{{2}}-\d{{2}}(?:[T ]{_TIME})?|\b{_TIME}")
-FY_LABEL = re.compile(r"\bFY\s?\d{4}(?:\s?[-–/]\s?\d{2,4})?|\b\d{4}\s?[-–]\s?\d{2,4}\b", re.IGNORECASE)
-PAGE_CITATION = re.compile(r"\b(?:pp?\.|pages?)\s?\d+(?:\s?[-–]\s?\d+)?", re.IGNORECASE)
+FY_LABEL = re.compile(
+    r"\bFY\s?\d{4}(?:\s?[-–/]\s?\d{2,4})?|\b\d{4}\s?[-–]\s?\d{2,4}\b", re.IGNORECASE
+)
+# One page reference: "p. 70", "pp. 132–135", "pp. 132-135, 166", "p. 14, 19".
+# After the first page, keep eating "- – —" ranges and ", n" list items.
+PAGE_CITATION = re.compile(
+    r"\b(?:pp?\.|pages?)\s?\d+(?:\s?[-–—]\s?\d+|,\s?\d+)*", re.IGNORECASE
+)
 
 # Optional minus, digits with optional comma groups (5,84,519 or 584,519), optional decimals.
 NUMBER = re.compile(r"(?<!\w)-?\d+(?:,\d+)*(?:\.\d+)?")
@@ -15,8 +24,9 @@ NUMBER = re.compile(r"(?<!\w)-?\d+(?:,\d+)*(?:\.\d+)?")
 def _clean(text):
     """Blank out dates, times, FY labels and page citations."""
     text = ISO_DATETIME.sub(" ", text)
-    text = FY_LABEL.sub(" ", text)
-    return PAGE_CITATION.sub(" ", text)
+    # Pages before FY, so a range like "pp. 1320-1350" is not read as a year range.
+    text = PAGE_CITATION.sub(" ", text)
+    return FY_LABEL.sub(" ", text)
 
 
 def _extract(text):
@@ -30,11 +40,11 @@ def _extract(text):
     return found
 
 
-def extract_numbers(text):
+def extract_numbers(text: str) -> list[float]:
     return [value for value, _ in _extract(text)]
 
 
-def find_unsupported(draft, evidence_texts):
+def find_unsupported(draft: str, evidence_texts: list[str]) -> list[float]:
     """Numbers in the draft that no evidence number equals or rounds to."""
     evidence_numbers = [n for text in evidence_texts for n in extract_numbers(text)]
     unsupported = []
@@ -52,18 +62,21 @@ def _with_context(text, width=30):
     for m in NUMBER.finditer(text):
         token = m.group().replace(",", "")
         places = len(token.split(".")[1]) if "." in token else 0
-        snippet = text[max(0, m.start() - width):m.end() + width].replace("\n", " ")
+        snippet = text[max(0, m.start() - width) : m.end() + width].replace("\n", " ")
         found.append((float(token), places, snippet))
     return found
 
 
-def explain_support(draft, evidence_texts):
+def explain_support(draft: str, evidence_texts: list[str]) -> None:
     """Debug: print which evidence number (if any) supports each draft number."""
     evidence = [item for text in evidence_texts for item in _with_context(text)]
     for value, places, snippet in _with_context(draft):
-        print(f"draft {value}  ...{snippet}...")
-        match = next(((e, s) for e, _, s in evidence if abs(round(e, places) - value) < 1e-9), None)
+        logger.info("draft %s  ...%s...", value, snippet)
+        match = next(
+            ((e, s) for e, _, s in evidence if abs(round(e, places) - value) < 1e-9),
+            None,
+        )
         if match is None:
-            print("   -> UNSUPPORTED")
+            logger.info("   -> UNSUPPORTED")
         else:
-            print(f"   -> supported by evidence {match[0]}  ...{match[1]}...")
+            logger.info("   -> supported by evidence %s  ...%s...", match[0], match[1])

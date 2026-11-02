@@ -47,7 +47,9 @@ def offline(monkeypatch, tmp_path):
 
 
 def use_sample(monkeypatch, income, balance, currency="INR"):
-    monkeypatch.setattr(financials.yf, "Ticker", lambda symbol: FakeTicker(income, balance, currency))
+    monkeypatch.setattr(
+        financials.yf, "Ticker", lambda symbol: FakeTicker(income, balance, currency)
+    )
 
 
 def test_parses_sample_into_crore(monkeypatch, sample):
@@ -85,7 +87,9 @@ def test_missing_row_returns_null_with_note(monkeypatch, sample):
     assert "total_debt" in result["notes"][0]
 
 
-@pytest.mark.parametrize("ticker", ["", "   ", None, "TCS; DROP TABLE", "__import__('os')", "TCS.XX"])
+@pytest.mark.parametrize(
+    "ticker", ["", "   ", None, "TCS; DROP TABLE", "__import__('os')", "TCS.XX"]
+)
 def test_invalid_ticker_returns_error_without_network(ticker):
     # The autouse `offline` fixture makes any yfinance call fail, so this also proves none happened.
     result = financials.fetch_financials(ticker)
@@ -96,7 +100,9 @@ def test_invalid_ticker_returns_error_without_network(ticker):
 
 def test_get_financials_rejects_uncovered_ticker_but_accepts_covered(monkeypatch):
     calls = []
-    monkeypatch.setattr(financials, "fetch_financials", lambda t, y: calls.append(t) or {"ok": t})
+    monkeypatch.setattr(
+        financials, "fetch_financials", lambda t, y: calls.append(t) or {"ok": t}
+    )
 
     result = financials.get_financials.invoke({"ticker": "HCLTECH"})
     assert "error" in result and calls == []
