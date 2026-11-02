@@ -150,6 +150,7 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `docs/trace_before.png`, `docs/trace_after.png` | LangSmith traces of the Wipro CEO run before and after the critic fix (64.4 s vs 30.5 s) |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
 | `app.py` | Streamlit UI (flow in section 3): question box with 3 example buttons, Run, plan / evidence / draft / final report sections, Approve and "Request changes" + Send, report download, disclaimer footer. `get_graph()` (cached), `run_config()`, `safe_invoke()`, `runs_today()` / `count_run()` (cap `MAX_RUNS_PER_DAY` from `config.py`, default 20), `?thread=` in the URL |
+| `.github/workflows/ci.yml` | GitHub Actions on push/PR to main: Python 3.14, cached pip, `pip install -r requirements.txt`, `ruff check .`, `pytest`. No secrets; unit tests are offline |
 | `Dockerfile` | Image for the Streamlit app: `python:3.14-slim`, installs `requirements.txt` first (cached layer), copies the code, runs `streamlit run app.py` on `0.0.0.0:8501`. No keys and no `data/` inside |
 | `.dockerignore` | Keeps `.env`, `.venv`, `data/`, caches, `.git`, `playground/`, `evals/results/` and `docs/*.png` out of the image |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |

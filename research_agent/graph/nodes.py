@@ -288,9 +288,9 @@ def replanner(state: ResearchState) -> dict:
     llm = ChatOpenAI(model=llm_model()).with_structured_output(Plan)
     plan = llm.invoke([
         ("system", REPLANNER_PROMPT),
-        ("human", f"Original question: {state['question']}\n"
-                  f"Steps already done: {state['plan']}\n"
-                  f"User's change request: {state['human_feedback']}"),
+        ("human", (f"Original question: {state['question']}\n"
+                   f"Steps already done: {state['plan']}\n"
+                   f"User's change request: {state['human_feedback']}")),
     ])
     old = state["plan"]
     return {"plan": old + plan.steps, "current_step": len(old)}
