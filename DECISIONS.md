@@ -437,3 +437,14 @@
 - Why: Only the replanner can add steps. It reuses the existing executor, writer and critic. Executing only the new steps keeps finished work and does not repeat tool calls. The re-test found Salil Parekh, p. 14.
 - Trade-off: Every change request now makes an extra model call, even for "make it shorter". The scope check for new steps is only in the replanner prompt. Both after_replanner branches are tested (tests/test_routing.py, 17 routing tests).
 - Result (if measured): one re-test (F07): the request now fetched the CEO's name. Not measured on cost or latency.
+
+## 2026-11-03: Run the app in Docker (Python 3.14 slim, data/ as a volume, keys at run time)
+
+- Problem / context: The app only ran on my machine, inside my own venv and with my own .env. I wanted one command that runs it anywhere without baking secrets or the 1600-character index into the image.
+- Options considered:
+  1. Copy .env and data/ into the image so it runs with no arguments.
+  2. Use a slim image and keep data/ and the keys outside it: mount data/ as a volume and pass the keys with `--env-file` at run time.
+- Chose: Option 2. The Dockerfile starts from `python:3.14-slim`, installs requirements.txt, copies the code and starts Streamlit on port 8501. data/ is mounted as a volume. The keys come in at `docker run` time.
+- Why: The image holds no secrets, so it is safe to share. data/ holds the Chroma index and the SQLite checkpointer, so a volume means the index is not rebuilt and a paused run is not lost when the container is replaced.
+- Trade-off: The run command is longer (`--env-file` plus a volume). Python 3.14 is new, so some packages may not have wheels yet. `--env-file` keeps quotes as part of the value, so .env must have no quotes (F09).
+- Result (if measured): build 138 s; image holds no .env or data/; app ran in the container after the quote fix (F09); a paused run survived a container restart.

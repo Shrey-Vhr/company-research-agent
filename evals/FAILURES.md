@@ -75,3 +75,19 @@
 ## F08: Critic flagged a page number as an unsupported figure (2026-11-02)
 - The critic flagged a page number from a pp. citation list as an unsupported figure.
 - Fixed in extract_numbers; regression test added.
+
+## F09: OpenAI 401 inside Docker from quoted .env values (2026-11-03)
+- Where: the Docker container (docker run --env-file .env ...); the app showed
+  "Something went wrong" with error type OpenAIAuthenticationError
+- Error: 401 "Incorrect API key provided", and the masked key in the message
+  started and ended with a quote mark ("sk-proj...eMA")
+- Cause: .env had OPENAI_API_KEY="sk-proj-...". python-dotenv (local runs)
+  strips the quotes, so it worked on my laptop; Docker's --env-file keeps
+  them, so inside the container the key really began with a " character
+- Fix: removed the quotes (and any spaces around =) from every .env value;
+  added a comment to .env.example: "# No quotes around values: Docker's
+  --env-file keeps them."
+- Result: the same question ran in the container and still ran locally
+- Lesson: "works on my machine" can hide config differences. Two tools that
+  read the same .env file can read it differently, so test the container
+  with the real config, not just the build.

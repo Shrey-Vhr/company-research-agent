@@ -150,7 +150,10 @@ paused at human review can be continued later with `--resume <thread_id>`. **Bas
 | `docs/trace_before.png`, `docs/trace_after.png` | LangSmith traces of the Wipro CEO run before and after the critic fix (64.4 s vs 30.5 s) |
 | `data/cache/` | Cached `get_financials` results, one JSON per ticker (gitignored) |
 | `app.py` | Streamlit UI (flow in section 3): question box with 3 example buttons, Run, plan / evidence / draft / final report sections, Approve and "Request changes" + Send, report download, disclaimer footer. `get_graph()` (cached), `run_config()`, `safe_invoke()`, `runs_today()` / `count_run()` (cap `MAX_RUNS_PER_DAY` from `config.py`, default 20), `?thread=` in the URL |
+| `Dockerfile` | Image for the Streamlit app: `python:3.14-slim`, installs `requirements.txt` first (cached layer), copies the code, runs `streamlit run app.py` on `0.0.0.0:8501`. No keys and no `data/` inside |
+| `.dockerignore` | Keeps `.env`, `.venv`, `data/`, caches, `.git`, `playground/`, `evals/results/` and `docs/*.png` out of the image |
 | `.env` | `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`, LangSmith settings (gitignored) |
+| `.env.example` | Template of every variable the code reads, with empty values (copy to `.env`; no quotes around values) |
 | `requirements.txt` | Dependencies pinned to exact versions (`==`, top-level packages only), including LangGraph, the SQLite checkpointer and Streamlit |
 | `CLAUDE.md` / `DECISIONS.md` / `FLOW.md` | Working rules / decision log / this file |
 | `README.md` | Title only |
@@ -238,3 +241,20 @@ Used by `raw_agent` and by the graph's `executor` (same three tool functions).
   19,352 input and 429 output tokens over 4 rounds (about 45 times more input than output, which fits the history being resent). The 1,600-char index has 3,314 chunks vs 1,839 for 3,200 chars, so building it cost more to embed too.
 - **Replanner:** a change request costs one extra model call even when it only asks for new wording. Added steps are not scope-checked in code, only by
   `REPLANNER_PROMPT`. The `auto_approve` path never reaches it.
+
+## 7. Run with Docker
+The image holds only the code and libraries. Keys come from `.env` at run time and `data/` (PDFs, Chroma index,
+cache, SQLite files) is mounted from your disk, so the index and saved runs survive container restarts. `data/` must
+already exist on the host (build it first with `python -m scripts.build_index`). Windows PowerShell, from the project folder:
+
+```powershell
+# build the image (re-run after code changes; the pip layer is cached unless requirements.txt changes)
+docker build -t company-research-agent .
+
+# run it: keys from .env, data/ mounted, app on http://localhost:8501
+docker run --rm -p 8501:8501 --env-file .env -v "${PWD}/data:/app/data" company-research-agent
+```
+
+- Stop with Ctrl+C. `--rm` removes the container, not `data/`.
+- `--env-file` does not strip quotes: write `OPENAI_API_KEY=sk-...` without `"` in `.env`.
+- Untested limit: SQLite files on a Windows bind mount (`checkpoints.sqlite`, `usage.sqlite`) may be slow or lock under Docker Desktop.

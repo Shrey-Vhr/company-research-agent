@@ -1,0 +1,19 @@
+# Secrets and local environments
+.env
+.venv/
+
+# Runtime data: mounted as a volume, never baked into the image
+data/
+
+# Python and tool caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Not needed to run the app
+.git/
+.vscode/
+playground/
+evals/results/
+docs/*.png
