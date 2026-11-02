@@ -66,3 +66,5 @@
   out-of-scope questions. Fix the tool to reject tickers outside TCS, INFY, WIPRO.
 - Repeat run: raw gave the wrong HCLTech revenue in 3 of 3; both graph
   versions refused in 3 of 3.
+
+- Fixed in v1.0: get_financials rejects tickers outside TCS, INFY, WIPRO.

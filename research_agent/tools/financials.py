@@ -21,6 +21,7 @@ CACHE_VERSION = 1  # bump when the saved format changes, so old files are re-dow
 # Letters, digits, & and - (e.g. "M&M", "BAJAJ-AUTO"), optionally ending in .NS or .BO
 TICKER_PATTERN = re.compile(r"^[A-Z0-9&-]{1,20}(\.(NS|BO))?$")
 
+COVERED = {"TCS", "INFY", "WIPRO"}
 # Output field -> (statement, yfinance row names to try in order)
 FIELDS = {
     "revenue": ("income", ["Total Revenue", "Operating Revenue"]),
@@ -175,7 +176,7 @@ def fetch_financials(ticker, years=3):
         return {"error": f"Invalid ticker {ticker!r}. Use an NSE symbol like 'TCS' or 'TCS.NS'."}
     if not isinstance(years, int) or not 1 <= years <= MAX_YEARS:
         return {"error": f"years must be a whole number from 1 to {MAX_YEARS} (yfinance keeps about 4 years)."}
-
+    
     data = read_cache(symbol)
     from_cache = data is not None
     if data is None:
@@ -202,7 +203,7 @@ def fetch_financials(ticker, years=3):
 
 @tool
 def get_financials(ticker: str, years: int = 3) -> dict:
-    """Get yearly financials for an Indian company listed on the NSE.
+    """Get yearly financials for an Indian company listed on the NSE.(it covers only TCS, INFY and WIPRO.)
 
     Use this for any question about a company's revenue, operating income, net income,
     total debt or total equity. To compare companies, call it once per company.
@@ -219,5 +220,8 @@ def get_financials(ticker: str, years: int = 3) -> dict:
     are converted from USD and are approximate. If the result has an "error" key, the call failed;
     fix the ticker or tell the user, and do not make up numbers. Cite the "source" field.
     """
+    symbol = ticker.strip().upper().removesuffix(".NS")
+    if symbol not in COVERED:
+        return {"error": f"{ticker} is not covered. Only TCS, INFY and WIPRO are available in this version."}
     return fetch_financials(ticker, years)
 

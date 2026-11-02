@@ -92,3 +92,15 @@ def test_invalid_ticker_returns_error_without_network(ticker):
 
     assert set(result) == {"error"}
     assert "Invalid ticker" in result["error"]
+
+
+def test_get_financials_rejects_uncovered_ticker_but_accepts_covered(monkeypatch):
+    calls = []
+    monkeypatch.setattr(financials, "fetch_financials", lambda t, y: calls.append(t) or {"ok": t})
+
+    result = financials.get_financials.invoke({"ticker": "HCLTECH"})
+    assert "error" in result and calls == []
+
+    for ticker in ("tcs", "INFY.NS"):
+        assert "error" not in financials.get_financials.invoke({"ticker": ticker})
+    assert calls == ["tcs", "INFY.NS"]
