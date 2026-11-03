@@ -4,11 +4,6 @@
 
 A LangGraph research agent that answers questions about TCS, Infosys and Wipro from their financials and FY2025-26 annual reports, with page citations.
 
-## Demo
-
-![Demo](docs/demo.gif) <!-- TODO: record and add docs/demo.gif -->
-
-2-minute video: [link goes here] <!-- TODO: add video URL -->
 
 ## What it does
 
